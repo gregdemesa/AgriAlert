@@ -6,25 +6,11 @@ import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { PlantingCard } from "@/components/dashboard/PlantingCard";
 import { RecommendationsProvider } from "@/lib/RecommendationsContext";
 import { usePlanting } from "@/lib/PlantingContext";
+import { useAlerts } from "@/lib/AlertContext";
 
 const Dashboard = () => {
-  // Mock data for alerts
-  const alertsData = [
-    {
-      id: "1",
-      title: "Heavy Rainfall Expected",
-      description: "Expect 15-20mm of rainfall in the next 24 hours, which may affect lowland crops.",
-      level: "severe" as const,
-      time: "Today, 10:30 AM",
-    },
-    {
-      id: "2",
-      title: "Weather Warning",
-      description: "High temperatures forecasted for the next week; ensure adequate irrigation.",
-      level: "warning" as const,
-      time: "Yesterday, 3:15 PM",
-    },
-  ];
+  // Get alerts from context
+  const { currentAlerts } = useAlerts();
 
   // Get crops data from context
   const { activeCrops } = usePlanting();
@@ -41,7 +27,7 @@ const Dashboard = () => {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <WeatherCard />
-          <AlertCard alerts={alertsData} />
+          <AlertCard alerts={currentAlerts} />
           <RecommendationsCard />
           <ForecastCard />
           <PlantingCard />

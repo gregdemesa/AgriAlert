@@ -10,6 +10,7 @@ import { LocationProvider } from "./lib/LocationContext";
 import { WeatherProvider } from "./lib/WeatherContext";
 import { GeminiProvider } from "./lib/GeminiContext";
 import { PlantingProvider } from "./lib/PlantingContext";
+import { AlertProvider } from "./lib/AlertContext";
 import { LocationInitializer } from "./components/location/LocationInitializer";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -32,12 +33,13 @@ const App = () => (
         {/* This component automatically requests location permission when the app loads */}
         <LocationInitializer />
         <WeatherProvider>
-          <GeminiProvider>
-            <PlantingProvider>
-              <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
+          <AlertProvider>
+            <GeminiProvider>
+              <PlantingProvider>
+                <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
@@ -59,9 +61,10 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
-          </PlantingProvider>
-          </GeminiProvider>
+                </TooltipProvider>
+              </PlantingProvider>
+            </GeminiProvider>
+          </AlertProvider>
         </WeatherProvider>
       </LocationProvider>
     </AuthProvider>

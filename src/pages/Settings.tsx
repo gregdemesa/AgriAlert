@@ -12,7 +12,7 @@ import { useLocation } from "@/lib/LocationContext";
 import { useToast } from "@/components/ui/use-toast";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { LocationDisplay } from "@/components/location/LocationDisplay";
-import { LocationRequest } from "@/components/location/LocationRequest";
+import { EmailNotificationSettings, defaultEmailNotificationSettings } from "@/lib/emailService";
 
 const Settings = () => {
   const { currentUser } = useAuth();
@@ -30,19 +30,8 @@ const Settings = () => {
   // We no longer need to show the location request component
   // as it's now handled at the app level
 
-  // Notification settings
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-  });
-
-  const [emailNotificationTypes, setEmailNotificationTypes] = useState({
-    weatherAlerts: true,
-    harvestReminders: true,
-    marketUpdates: false,
-    systemUpdates: true,
-  });
+  // Email notification settings
+  const [emailNotifications, setEmailNotifications] = useState<EmailNotificationSettings>(defaultEmailNotificationSettings);
 
   // Load user data when component mounts
   useEffect(() => {
@@ -403,117 +392,77 @@ const Settings = () => {
         <TabsContent value="notifications" className="pt-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Notification Channels</CardTitle>
+              <CardTitle>Email Notifications</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="email-notifications">Email Notifications</Label>
+                  <Label htmlFor="email-notifications">Enable Email Notifications</Label>
                   <p className="text-sm text-muted-foreground">
                     Receive alerts and updates via email
                   </p>
                 </div>
                 <Switch
                   id="email-notifications"
-                  checked={notifications.email}
+                  checked={emailNotifications.enabled}
                   onCheckedChange={(checked) =>
-                    setNotifications({ ...notifications, email: checked })
+                    setEmailNotifications({ ...emailNotifications, enabled: checked })
                   }
                 />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="push-notifications">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive alerts on your mobile device
-                  </p>
+              <p className="text-sm font-medium mb-2">Notification Types</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="weather-alerts">Weather Alerts</Label>
+                  <Switch
+                    id="weather-alerts"
+                    checked={emailNotifications.types.weatherAlerts}
+                    onCheckedChange={(checked) =>
+                      setEmailNotifications({
+                        ...emailNotifications,
+                        types: {
+                          ...emailNotifications.types,
+                          weatherAlerts: checked,
+                        },
+                      })
+                    }
+                  />
                 </div>
-                <Switch
-                  id="push-notifications"
-                  checked={notifications.push}
-                  onCheckedChange={(checked) =>
-                    setNotifications({ ...notifications, push: checked })
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="sms-notifications">SMS Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive critical alerts via text message
-                  </p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="harvest-reminders">Harvest Reminders</Label>
+                  <Switch
+                    id="harvest-reminders"
+                    checked={emailNotifications.types.harvestReminders}
+                    onCheckedChange={(checked) =>
+                      setEmailNotifications({
+                        ...emailNotifications,
+                        types: {
+                          ...emailNotifications.types,
+                          harvestReminders: checked,
+                        },
+                      })
+                    }
+                  />
                 </div>
-                <Switch
-                  id="sms-notifications"
-                  checked={notifications.sms}
-                  onCheckedChange={(checked) =>
-                    setNotifications({ ...notifications, sms: checked })
-                  }
-                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="system-updates">System Updates</Label>
+                  <Switch
+                    id="system-updates"
+                    checked={emailNotifications.types.systemUpdates}
+                    onCheckedChange={(checked) =>
+                      setEmailNotifications({
+                        ...emailNotifications,
+                        types: {
+                          ...emailNotifications.types,
+                          systemUpdates: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Types</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="weather-alerts">Weather Alerts</Label>
-                <Switch
-                  id="weather-alerts"
-                  checked={emailNotificationTypes.weatherAlerts}
-                  onCheckedChange={(checked) =>
-                    setEmailNotificationTypes({
-                      ...emailNotificationTypes,
-                      weatherAlerts: checked,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="harvest-reminders">Harvest Reminders</Label>
-                <Switch
-                  id="harvest-reminders"
-                  checked={emailNotificationTypes.harvestReminders}
-                  onCheckedChange={(checked) =>
-                    setEmailNotificationTypes({
-                      ...emailNotificationTypes,
-                      harvestReminders: checked,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="market-updates">Market Updates</Label>
-                <Switch
-                  id="market-updates"
-                  checked={emailNotificationTypes.marketUpdates}
-                  onCheckedChange={(checked) =>
-                    setEmailNotificationTypes({
-                      ...emailNotificationTypes,
-                      marketUpdates: checked,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="system-updates">System Updates</Label>
-                <Switch
-                  id="system-updates"
-                  checked={emailNotificationTypes.systemUpdates}
-                  onCheckedChange={(checked) =>
-                    setEmailNotificationTypes({
-                      ...emailNotificationTypes,
-                      systemUpdates: checked,
-                    })
-                  }
-                />
-              </div>
-              <Button>Save Preferences</Button>
+              <Button className="mt-2">Save Preferences</Button>
             </CardContent>
           </Card>
         </TabsContent>

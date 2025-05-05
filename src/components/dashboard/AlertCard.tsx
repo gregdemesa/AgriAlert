@@ -2,16 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-export type AlertLevel = "warning" | "severe" | "emergency";
-
-interface Alert {
-  id: string;
-  title: string;
-  description: string;
-  level: AlertLevel;
-  time: string;
-}
+import { Alert, AlertLevel } from "@/lib/AlertContext";
 
 interface AlertCardProps {
   alerts: Alert[];

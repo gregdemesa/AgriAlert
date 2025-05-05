@@ -2,50 +2,12 @@
 import { AlertCard } from "@/components/dashboard/AlertCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAlerts } from "@/lib/AlertContext";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const Alerts = () => {
-  // Mock data for current alerts
-  const currentAlerts = [
-    {
-      id: "1",
-      title: "Heavy Rainfall Expected",
-      description: "Expect 15-20mm of rainfall in the next 24 hours, which may affect lowland crops.",
-      level: "severe" as const,
-      time: "Today, 10:30 AM",
-    },
-    {
-      id: "2",
-      title: "Weather Warning",
-      description: "High temperatures forecasted for the next week; ensure adequate irrigation.",
-      level: "warning" as const,
-      time: "Yesterday, 3:15 PM",
-    },
-  ];
-
-  // Mock data for past alerts
-  const pastAlerts = [
-    {
-      id: "3",
-      title: "Typhoon Warning",
-      description: "Typhoon expected to make landfall in 72 hours. Secure crops and farm equipment.",
-      level: "emergency" as const,
-      time: "Sep 15, 2:30 PM",
-    },
-    {
-      id: "4",
-      title: "Pest Alert: Fall Armyworm",
-      description: "Fall armyworm detected in neighboring farms. Inspect crops and apply preventive measures.",
-      level: "severe" as const,
-      time: "Sep 10, 9:15 AM",
-    },
-    {
-      id: "5",
-      title: "Drought Advisory",
-      description: "Extended dry period expected. Implement water conservation measures.",
-      level: "warning" as const,
-      time: "Aug 28, 11:45 AM",
-    },
-  ];
+  const { currentAlerts, pastAlerts, emailNotificationsEnabled, setEmailNotificationsEnabled } = useAlerts();
 
   return (
     <div className="space-y-6">
@@ -71,43 +33,27 @@ const Alerts = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Alert Settings</CardTitle>
+          <CardTitle>Email Notification Settings</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="alert-radius">
-                Alert Radius
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  id="alert-radius"
-                  min="5"
-                  max="50"
-                  defaultValue="20"
-                  className="w-full"
-                />
-                <span className="text-sm">20 km</span>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="email-notifications">Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive alerts via email
+                </p>
               </div>
+              <Switch
+                id="email-notifications"
+                checked={emailNotificationsEnabled}
+                onCheckedChange={setEmailNotificationsEnabled}
+              />
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Alert Types</label>
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="weather-alerts" defaultChecked />
-                  <label htmlFor="weather-alerts">Weather Alerts</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="pest-alerts" defaultChecked />
-                  <label htmlFor="pest-alerts">Pest & Disease Alerts</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="market-alerts" defaultChecked />
-                  <label htmlFor="market-alerts">Market Price Alerts</label>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground mt-4">
+              When enabled, you will receive email notifications for new weather alerts.
+              You can customize which types of notifications you receive in the Settings page.
+            </p>
           </div>
         </CardContent>
       </Card>
