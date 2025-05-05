@@ -1,56 +1,96 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Loader2, Image as ImageIcon, X, ArrowDown } from "lucide-react";
+import { useGemini } from "@/lib/GeminiContext";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const AIAdvisor = () => {
   const [message, setMessage] = useState("");
-  
-  // Mock chat history
-  const [chatHistory, setChatHistory] = useState([
-    {
-      type: "system",
-      content: "Welcome to AgriAlert AI Advisor. How can I help you with your farming needs today?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-    {
-      type: "user",
-      content: "My rice crop is showing yellow leaves. What could be wrong?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-    {
-      type: "ai",
-      content: "Yellow leaves in rice crops can be caused by several factors:\n\n1. Nitrogen deficiency: The most common cause, especially if older leaves turn yellow first.\n\n2. Iron deficiency: If young leaves are turning yellow while the veins remain green.\n\n3. Water stress: Either too much or too little water can cause yellowing.\n\n4. Disease: Bacterial leaf blight or rice blast can cause yellowing.\n\nBased on the current weather in your area (which has been fairly wet), and without more specific information, I'd suggest checking for nitrogen deficiency first. Consider applying a nitrogen-rich fertilizer and monitor for improvement. Would you like specific fertilizer recommendations for your soil type?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Use the Gemini context instead of local state
+  const { chatHistory, isLoading, sendMessage, sendImageMessage, clearChat } = useGemini();
+
+  // Handle scroll events to show/hide scroll button
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+      // Show button if not at bottom (with a small threshold)
+      setShowScrollButton(scrollHeight - scrollTop - clientHeight > 100);
+    };
+
+    chatContainer.addEventListener('scroll', handleScroll);
+    return () => chatContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll to bottom of chat when messages change
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    
-    // Add user message to chat
-    const userMessage = {
-      type: "user",
-      content: message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    
-    setChatHistory([...chatHistory, userMessage]);
+
+    if (selectedImage) {
+      // Send message with image
+      await sendImageMessage(message, selectedImage);
+      setSelectedImage(null);
+    } else {
+      // Send text-only message
+      await sendMessage(message);
+    }
+
     setMessage("");
-    
-    // Simulate AI response (in a real app, this would be an API call)
-    setTimeout(() => {
-      const aiResponse = {
-        type: "ai",
-        content: "I'll need to analyze that situation further based on your local conditions and crop variety. Based on the weather forecast for your area, I'd recommend monitoring closely and considering preventive measures. Would you like me to provide more specific advice?",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setChatHistory(prev => [...prev, aiResponse]);
-    }, 1000);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImage(reader.result as string);
+      setIsUploading(false);
+    };
+    reader.onerror = () => {
+      console.error('Error reading file');
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleQuickTopic = (topic: string) => {
+    setMessage(topic);
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -63,47 +103,139 @@ const AIAdvisor = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2 h-[600px] flex flex-col">
+        <Card className="md:col-span-2 h-[600px] flex flex-col overflow-hidden">
           <CardHeader className="pb-2 border-b">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-agri-green" />
-              Advisor Chat
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-            {chatHistory.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex ${
-                  msg.type === "user" ? "justify-end" : "justify-start"
-                }`}
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-agri-green" />
+                Advisor Chat
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearChat}
+                disabled={isLoading || chatHistory.length <= 1}
               >
+                Clear Chat
+              </Button>
+            </div>
+          </CardHeader>
+          <div className="relative flex-1 overflow-hidden">
+            <CardContent ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+              {chatHistory.map((msg, index) => (
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    msg.type === "user"
-                      ? "bg-agri-green text-white"
-                      : msg.type === "system"
-                      ? "bg-gray-100 text-gray-800"
-                      : "bg-gray-200 text-gray-800"
+                  key={index}
+                  className={`flex ${
+                    msg.type === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                  <div className="text-xs mt-1 opacity-70 text-right">
-                    {msg.timestamp}
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${
+                      msg.type === "user"
+                        ? "bg-agri-green text-white"
+                        : msg.type === "system"
+                        ? "bg-gray-100 text-gray-800"
+                        : "bg-gray-200 text-gray-800"
+                    }`}
+                  >
+                    {msg.imageUrl && (
+                      <div className="mb-2">
+                        <img
+                          src={msg.imageUrl}
+                          alt="Uploaded crop"
+                          className="rounded-md max-h-48 w-auto"
+                        />
+                      </div>
+                    )}
+                    {msg.type === 'ai' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mb-2 prose-headings:mt-1 prose-p:mb-2 prose-p:leading-relaxed prose-li:mb-0.5 prose-li:leading-relaxed prose-ul:mt-1 prose-ul:mb-1 prose-ol:mt-1 prose-ol:mb-1 prose-h1:text-lg prose-h2:text-base prose-h3:text-sm">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
+                    <div className="text-xs mt-1 opacity-70 text-right">
+                      {msg.timestamp}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
+              ))}
+              {isLoading && (
+                <div className="flex justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-agri-green" />
+                </div>
+              )}
+            </CardContent>
+
+            {showScrollButton && (
+              <Button
+                className="fixed bottom-28 right-8 rounded-full h-10 w-10 p-0 shadow-md z-10"
+                onClick={scrollToBottom}
+                size="icon"
+                variant="secondary"
+              >
+                <ArrowDown className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
           <div className="p-4 border-t">
+            {selectedImage && (
+              <div className="mb-2 relative">
+                <div className="flex items-center gap-2 p-2 border rounded-md">
+                  <img
+                    src={selectedImage}
+                    alt="Selected"
+                    className="h-12 w-auto rounded"
+                  />
+                  <span className="text-sm truncate flex-1">Image selected</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={clearSelectedImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your farming question..."
                 className="flex-1"
+                disabled={isLoading}
               />
-              <Button type="submit">Send</Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || !!selectedImage}
+              >
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-4 w-4" />
+                )}
+              </Button>
+              <Button type="submit" disabled={isLoading || !message.trim()}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                Send
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+                disabled={isLoading}
+              />
             </form>
           </div>
         </Card>
@@ -114,19 +246,39 @@ const AIAdvisor = () => {
               <CardTitle>Quick Topics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start text-left">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left"
+                onClick={() => handleQuickTopic("Can you help me identify common pests in rice crops?")}
+              >
                 Pest identification
               </Button>
-              <Button variant="outline" className="w-full justify-start text-left">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left"
+                onClick={() => handleQuickTopic("What are the best practices for managing crop diseases in wet conditions?")}
+              >
                 Disease management
               </Button>
-              <Button variant="outline" className="w-full justify-start text-left">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left"
+                onClick={() => handleQuickTopic("How can I adapt my farming practices to the current weather forecast?")}
+              >
                 Weather adaptation
               </Button>
-              <Button variant="outline" className="w-full justify-start text-left">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left"
+                onClick={() => handleQuickTopic("What fertilizers would you recommend for my crops based on local conditions?")}
+              >
                 Fertilizer recommendations
               </Button>
-              <Button variant="outline" className="w-full justify-start text-left">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left"
+                onClick={() => handleQuickTopic("Can you suggest an optimal irrigation schedule for my crops?")}
+              >
                 Irrigation scheduling
               </Button>
             </CardContent>
@@ -143,18 +295,20 @@ const AIAdvisor = () => {
                 </p>
                 <div className="grid gap-2">
                   <label
-                    htmlFor="photo-upload"
+                    htmlFor="photo-upload-card"
                     className="cursor-pointer border-2 border-dashed rounded-md p-6 text-center"
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    <span className="text-sm text-muted-foreground">
-                      Click to upload a photo
-                    </span>
-                    <input
-                      id="photo-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                    />
+                    <div className="flex flex-col items-center gap-2">
+                      {isUploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-agri-green" />
+                      ) : (
+                        <ImageIcon className="h-6 w-6 text-agri-green" />
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {isUploading ? "Uploading..." : "Click to upload a photo"}
+                      </span>
+                    </div>
                   </label>
                 </div>
               </div>
