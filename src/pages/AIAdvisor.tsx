@@ -94,16 +94,16 @@ const AIAdvisor = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">AI Crop Advisor</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-4 py-2">
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold tracking-tight mb-1">AI Crop Advisor</h1>
+        <p className="text-sm text-muted-foreground">
           Get personalized advice for your crops based on local conditions and AI analysis.
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2 h-[600px] flex flex-col overflow-hidden">
+        <Card className="md:col-span-2 h-[calc(100vh-10rem)] flex flex-col overflow-hidden">
           <CardHeader className="pb-2 border-b">
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -171,7 +171,7 @@ const AIAdvisor = () => {
 
             {showScrollButton && (
               <Button
-                className="fixed bottom-28 right-8 rounded-full h-10 w-10 p-0 shadow-md z-10"
+                className="absolute bottom-4 right-4 rounded-full h-10 w-10 p-0 shadow-md z-10"
                 onClick={scrollToBottom}
                 size="icon"
                 variant="secondary"
@@ -240,12 +240,12 @@ const AIAdvisor = () => {
           </div>
         </Card>
 
-        <div className="space-y-6">
-          <Card>
+        <div className="space-y-4 flex flex-col h-[calc(100vh-10rem)]">
+          <Card className="flex-1">
             <CardHeader>
               <CardTitle>Quick Topics</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 overflow-y-auto">
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
@@ -284,11 +284,11 @@ const AIAdvisor = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="flex-shrink-0">
+            <CardHeader className="pb-2">
               <CardTitle>Upload Photos</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-2">
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Upload photos of your crops for more accurate diagnosis.
