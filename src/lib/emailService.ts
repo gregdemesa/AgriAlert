@@ -67,7 +67,7 @@ export const sendEmail = async (
     const emailData: EmailData = {
       sender: {
         name: 'AgriAlert',
-        email: 'notifications@agrialert.com',
+        email: 'teamyapac@gmail.com'
       },
       to: [
         {
