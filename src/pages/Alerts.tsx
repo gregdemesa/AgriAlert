@@ -5,9 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAlerts } from "@/lib/AlertContext";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 const Alerts = () => {
-  const { currentAlerts, pastAlerts, emailNotificationsEnabled, setEmailNotificationsEnabled } = useAlerts();
+  const { currentAlerts, pastAlerts, emailNotificationsEnabled, setEmailNotificationsEnabled, isLoading } = useAlerts();
 
   return (
     <div className="space-y-6">
@@ -24,10 +25,28 @@ const Alerts = () => {
           <TabsTrigger value="past">Past Alerts</TabsTrigger>
         </TabsList>
         <TabsContent value="current" className="pt-4">
-          <AlertCard alerts={currentAlerts} />
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              </CardContent>
+            </Card>
+          ) : (
+            <AlertCard alerts={currentAlerts} />
+          )}
         </TabsContent>
         <TabsContent value="past" className="pt-4">
-          <AlertCard alerts={pastAlerts} />
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              </CardContent>
+            </Card>
+          ) : (
+            <AlertCard alerts={pastAlerts} />
+          )}
         </TabsContent>
       </Tabs>
 
