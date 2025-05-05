@@ -126,6 +126,8 @@ export const getActiveCrops = async (userId: string): Promise<ActiveCrop[]> => {
       return [];
     }
 
+    console.log("Fetching active crops for user:", userId);
+
     const q = query(
       cropsCollection,
       where('userId', '==', userId),
@@ -134,7 +136,15 @@ export const getActiveCrops = async (userId: string): Promise<ActiveCrop[]> => {
     );
 
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => convertDocToCrop(doc) as ActiveCrop);
+    console.log(`Found ${querySnapshot.docs.length} active crops in Firestore`);
+
+    const crops = querySnapshot.docs.map(doc => {
+      const crop = convertDocToCrop(doc) as ActiveCrop;
+      console.log(`Active crop: ${crop.name}, status: ${crop.status}, id: ${crop.id}`);
+      return crop;
+    });
+
+    return crops;
   } catch (error) {
     console.error("Error fetching active crops:", error);
     // Re-throw the error to be handled by the React Query retry mechanism
@@ -204,12 +214,25 @@ export const getCropById = async (cropId: string): Promise<Crop | null> => {
 
 // Update a crop
 export const updateCrop = async (cropId: string, cropData: Partial<Crop>): Promise<void> => {
+  console.log(`Updating crop with ID: ${cropId}`);
+  console.log('Update data:', cropData);
+
   const docRef = doc(db, 'crops', cropId);
+
+  // First get the current data to log it
+  const currentDoc = await getDoc(docRef);
+  if (currentDoc.exists()) {
+    console.log('Current crop data:', currentDoc.data());
+  } else {
+    console.warn(`Crop with ID ${cropId} not found in Firestore`);
+  }
 
   await updateDoc(docRef, {
     ...cropData,
     updatedAt: serverTimestamp(),
   });
+
+  console.log(`Crop ${cropId} updated successfully`);
 };
 
 // Delete a crop
@@ -222,10 +245,23 @@ export const deleteCrop = async (cropId: string): Promise<void> => {
 export const updateCropStatus = async (cropId: string, status: CropStatus): Promise<void> => {
   const docRef = doc(db, 'crops', cropId);
 
+  // First get the current data to preserve userId
+  const cropDoc = await getDoc(docRef);
+  if (!cropDoc.exists()) {
+    throw new Error(`Crop with ID ${cropId} not found`);
+  }
+
+  const currentData = cropDoc.data();
+  console.log('Current crop data before status update:', currentData);
+
   await updateDoc(docRef, {
     status,
+    // Preserve the userId from the current document
+    userId: currentData.userId,
     updatedAt: serverTimestamp(),
   });
+
+  console.log(`Successfully updated crop ${cropId} status to ${status}`);
 };
 
 // Mark a crop as completed (harvested)
@@ -248,11 +284,17 @@ export const markCropAsHarvested = async (
       throw new Error(`Crop with ID ${cropId} not found`);
     }
 
+    // Get the current data to preserve userId
+    const currentData = cropDoc.data();
+    console.log('Current crop data before harvest:', currentData);
+
     await updateDoc(docRef, {
       status: 'completed',
       harvestDate,
       yield: yieldAmount,
       notes,
+      // Preserve the userId from the current document
+      userId: currentData.userId,
       updatedAt: serverTimestamp(),
     });
 

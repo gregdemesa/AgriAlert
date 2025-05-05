@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, AlertTriangle, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { usePlanting } from "@/lib/PlantingContext";
+import { useAuth } from "@/lib/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,8 @@ const PlantingSchedule = () => {
     deleteCrop,
     markCropAsHarvested
   } = usePlanting();
+  const { currentUser } = useAuth();
+  const userId = currentUser?.uid;
   const { toast } = useToast();
 
   // State for the crop form dialog
@@ -99,6 +102,15 @@ const PlantingSchedule = () => {
     // Clean up the timeout when the component unmounts or when the tab changes again
     return () => clearTimeout(debouncedRefetch);
   }, [currentTab]);
+
+  // Log active crops whenever they change
+  useEffect(() => {
+    if (activeCrops.data) {
+      const activeStatusCrops = activeCrops.data.filter(crop => crop.status === 'active');
+      console.log('Crops with active status:', activeStatusCrops);
+      console.log('All crops in activeCrops:', activeCrops.data);
+    }
+  }, [activeCrops.data]);
 
   // Function to get status badge classes
   const getStatusClass = (status: string) => {
@@ -218,8 +230,30 @@ const PlantingSchedule = () => {
   // Handle form submission for adding/editing a crop
   const handleFormSubmit = async (cropData: Omit<ActiveCrop | HistoricalCrop, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      if (!userId) {
+        console.error("No user ID available");
+        toast({
+          title: "Error",
+          description: "You must be logged in to perform this action.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (isEditing && selectedCrop?.id) {
-        await updateCrop(selectedCrop.id, cropData);
+        console.log('Updating crop with ID:', selectedCrop.id);
+        console.log('Previous status:', selectedCrop.status);
+        console.log('New status:', cropData.status);
+
+        // Ensure userId is included in the update data
+        const updateData = {
+          ...cropData,
+          userId: userId // Explicitly set the userId to preserve it
+        };
+
+        console.log('Update data with userId:', updateData);
+        await updateCrop(selectedCrop.id, updateData);
+        console.log('Crop updated in Firestore');
 
         // Determine which tab to show based on the new status
         if ('status' in cropData) {
@@ -233,16 +267,30 @@ const PlantingSchedule = () => {
         }
 
         // Explicitly refetch all data to ensure the UI is updated
-        activeCrops.refetch();
-        upcomingCrops.refetch();
-        historicalCrops.refetch();
+        console.log('Refetching all crop data...');
+        await Promise.all([
+          activeCrops.refetch(),
+          upcomingCrops.refetch(),
+          historicalCrops.refetch()
+        ]);
+        console.log('All crop data refetched');
 
         toast({
           title: "Crop updated",
           description: "The crop has been successfully updated.",
         });
       } else {
-        await addCrop(cropData);
+        console.log('Adding new crop with status:', cropData.status);
+
+        // Ensure userId is included in the new crop data
+        const newCropData = {
+          ...cropData,
+          userId: userId // Explicitly set the userId
+        };
+
+        console.log('New crop data with userId:', newCropData);
+        await addCrop(newCropData);
+        console.log('New crop added to Firestore');
 
         // Switch to the appropriate tab for the new crop
         if ('status' in cropData) {
@@ -256,9 +304,13 @@ const PlantingSchedule = () => {
         }
 
         // Explicitly refetch all data to ensure the UI is updated
-        activeCrops.refetch();
-        upcomingCrops.refetch();
-        historicalCrops.refetch();
+        console.log('Refetching all crop data...');
+        await Promise.all([
+          activeCrops.refetch(),
+          upcomingCrops.refetch(),
+          historicalCrops.refetch()
+        ]);
+        console.log('All crop data refetched');
 
         toast({
           title: "Crop added",
