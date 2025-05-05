@@ -1,39 +1,42 @@
 import { LocationData } from './LocationContext';
 
-// OpenWeatherMap API base URL
-const API_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+// WeatherAPI.com base URL
+const API_BASE_URL = 'https://api.weatherapi.com/v1';
 
 // API key from environment variables
-const API_KEY = import.meta.env.VITE_OPEN_WEATHER_MAP;
+const API_KEY = import.meta.env.VITE_FREE_WEATHER_API;
 
 // Weather condition mapping
 export type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'windy' | 'stormy' | 'snowy';
 
-// Map OpenWeatherMap condition codes to our app's condition types
-const mapWeatherCondition = (conditionCode: number): WeatherCondition => {
-  // Thunderstorm
-  if (conditionCode >= 200 && conditionCode < 300) {
+// Map WeatherAPI.com condition codes to our app's condition types
+const mapWeatherCondition = (conditionCode: number, conditionText: string): WeatherCondition => {
+  // Convert condition text to lowercase for easier comparison
+  const condition = conditionText.toLowerCase();
+
+  // Thunderstorm, storm
+  if (condition.includes('thunder') || condition.includes('storm')) {
     return 'stormy';
   }
-  // Drizzle or Rain
-  if ((conditionCode >= 300 && conditionCode < 400) || (conditionCode >= 500 && conditionCode < 600)) {
+  // Rain, drizzle, shower
+  if (condition.includes('rain') || condition.includes('drizzle') || condition.includes('shower')) {
     return 'rainy';
   }
-  // Snow
-  if (conditionCode >= 600 && conditionCode < 700) {
+  // Snow, sleet, blizzard
+  if (condition.includes('snow') || condition.includes('sleet') || condition.includes('blizzard') || condition.includes('ice')) {
     return 'snowy';
   }
-  // Atmosphere (fog, mist, etc.)
-  if (conditionCode >= 700 && conditionCode < 800) {
+  // Cloudy, overcast, fog, mist
+  if (condition.includes('cloud') || condition.includes('overcast') || condition.includes('fog') || condition.includes('mist')) {
     return 'cloudy';
   }
-  // Clear
-  if (conditionCode === 800) {
+  // Sunny, clear
+  if (condition.includes('sunny') || condition.includes('clear')) {
     return 'sunny';
   }
-  // Clouds
-  if (conditionCode > 800 && conditionCode < 900) {
-    return 'cloudy';
+  // Windy
+  if (condition.includes('wind') || condition.includes('gale')) {
+    return 'windy';
   }
   // Default
   return 'sunny';
@@ -78,34 +81,11 @@ export interface HourlyForecast {
   icon: string;
 }
 
-// Historical weather data interface
-export interface HistoricalWeather {
-  date: string;
-  temperature: number;
-  humidity: number;
-  windSpeed: number;
-  pressure: number;
-  condition: WeatherCondition;
-  description: string;
-  icon: string;
-}
-
-// Statistics data interface
-export interface WeatherStatistics {
-  period: string;
-  avgTemperature: number;
-  minTemperature: number;
-  maxTemperature: number;
-  avgHumidity: number;
-  avgPressure: number;
-  predominantCondition: WeatherCondition;
-}
-
 // Function to fetch current weather
 export const fetchCurrentWeather = async (location: LocationData): Promise<CurrentWeather> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/weather?lat=${location.latitude}&lon=${location.longitude}&units=metric&appid=${API_KEY}`
+      `${API_BASE_URL}/current.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&aqi=no`
     );
 
     if (!response.ok) {
@@ -113,25 +93,55 @@ export const fetchCurrentWeather = async (location: LocationData): Promise<Curre
     }
 
     const data = await response.json();
-    
-    // Extract city name
-    const cityName = data.name;
-    
+
+    // Extract location and current weather data
+    const { location: locationData, current } = data;
+
     // Map the API response to our CurrentWeather interface
     const weather: CurrentWeather = {
-      temperature: Math.round(data.main.temp),
-      condition: mapWeatherCondition(data.weather[0].id),
-      humidity: data.main.humidity,
-      windSpeed: Math.round(data.wind.speed),
-      location: cityName,
-      description: data.weather[0].description,
-      feelsLike: Math.round(data.main.feels_like),
-      pressure: data.main.pressure,
-      visibility: data.visibility / 1000, // Convert to km
-      sunrise: data.sys.sunrise,
-      sunset: data.sys.sunset,
-      icon: data.weather[0].icon,
+      temperature: Math.round(current.temp_c),
+      condition: mapWeatherCondition(current.condition.code, current.condition.text),
+      humidity: current.humidity,
+      windSpeed: Math.round(current.wind_kph),
+      location: `${locationData.name}, ${locationData.region}`,
+      description: current.condition.text,
+      feelsLike: Math.round(current.feelslike_c),
+      pressure: current.pressure_mb,
+      visibility: current.vis_km,
+      // Use default values for sunrise and sunset if not available
+      sunrise: 0,
+      sunset: 0,
+      icon: `https:${current.condition.icon}`,
     };
+
+    // Try to get sunrise and sunset times if available
+    try {
+      // Make a separate request to get forecast data with astronomy info
+      const forecastResponse = await fetch(
+        `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no`
+      );
+
+      if (forecastResponse.ok) {
+        const forecastData = await forecastResponse.json();
+        if (forecastData.forecast && forecastData.forecast.forecastday && forecastData.forecast.forecastday.length > 0) {
+          const astro = forecastData.forecast.forecastday[0].astro;
+          if (astro) {
+            // Convert 12-hour time format to timestamp
+            const sunriseTime = astro.sunrise;
+            const sunsetTime = astro.sunset;
+
+            const sunriseDate = new Date(`${locationData.localtime.split(' ')[0]} ${sunriseTime}`);
+            const sunsetDate = new Date(`${locationData.localtime.split(' ')[0]} ${sunsetTime}`);
+
+            weather.sunrise = Math.floor(sunriseDate.getTime() / 1000);
+            weather.sunset = Math.floor(sunsetDate.getTime() / 1000);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching sunrise/sunset times:', error);
+      // Use default values if there's an error
+    }
 
     return weather;
   } catch (error) {
@@ -144,7 +154,7 @@ export const fetchCurrentWeather = async (location: LocationData): Promise<Curre
 export const fetchForecast = async (location: LocationData): Promise<ForecastDay[]> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/forecast?lat=${location.latitude}&lon=${location.longitude}&units=metric&appid=${API_KEY}`
+      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=5&aqi=no&alerts=yes`
     );
 
     if (!response.ok) {
@@ -152,54 +162,28 @@ export const fetchForecast = async (location: LocationData): Promise<ForecastDay
     }
 
     const data = await response.json();
-    
+
     // Process the forecast data
-    // OpenWeatherMap returns forecast in 3-hour intervals for 5 days
-    // We'll aggregate this data to get daily forecasts
-    
-    const dailyForecasts: { [key: string]: ForecastDay } = {};
-    
-    // Group forecast data by day
-    data.list.forEach((item: any) => {
-      const date = new Date(item.dt * 1000);
-      const day = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const dateStr = date.toLocaleDateString('en-US');
-      
-      if (!dailyForecasts[dateStr]) {
-        dailyForecasts[dateStr] = {
-          day,
-          date: dateStr,
-          temperature: {
-            high: -Infinity,
-            low: Infinity,
-          },
-          condition: mapWeatherCondition(item.weather[0].id),
-          precipitation: 0,
-          icon: item.weather[0].icon,
-          description: item.weather[0].description,
-        };
-      }
-      
-      // Update high and low temperatures
-      if (item.main.temp_max > dailyForecasts[dateStr].temperature.high) {
-        dailyForecasts[dateStr].temperature.high = Math.round(item.main.temp_max);
-      }
-      
-      if (item.main.temp_min < dailyForecasts[dateStr].temperature.low) {
-        dailyForecasts[dateStr].temperature.low = Math.round(item.main.temp_min);
-      }
-      
-      // Update precipitation probability (if available)
-      if (item.pop) {
-        dailyForecasts[dateStr].precipitation = Math.max(
-          dailyForecasts[dateStr].precipitation,
-          Math.round(item.pop * 100)
-        );
-      }
+    // WeatherAPI.com returns forecast for up to 14 days
+    // We'll take the first 5 days
+
+    const forecastDays: ForecastDay[] = data.forecast.forecastday.map((item: any) => {
+      const date = new Date(item.date);
+      return {
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: date.toLocaleDateString('en-US'),
+        temperature: {
+          high: Math.round(item.day.maxtemp_c),
+          low: Math.round(item.day.mintemp_c),
+        },
+        condition: mapWeatherCondition(item.day.condition.code, item.day.condition.text),
+        precipitation: Math.round(item.day.daily_chance_of_rain),
+        icon: `https:${item.day.condition.icon}`,
+        description: item.day.condition.text,
+      };
     });
-    
-    // Convert to array and take only the first 5 days
-    return Object.values(dailyForecasts).slice(0, 5);
+
+    return forecastDays;
   } catch (error) {
     console.error('Error fetching forecast:', error);
     throw error;
@@ -210,7 +194,7 @@ export const fetchForecast = async (location: LocationData): Promise<ForecastDay
 export const fetchHourlyForecast = async (location: LocationData): Promise<HourlyForecast[]> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/forecast?lat=${location.latitude}&lon=${location.longitude}&units=metric&appid=${API_KEY}`
+      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no&alerts=yes&hour=24`
     );
 
     if (!response.ok) {
@@ -218,19 +202,19 @@ export const fetchHourlyForecast = async (location: LocationData): Promise<Hourl
     }
 
     const data = await response.json();
-    
-    // Process the hourly forecast data (first 24 hours / 8 data points)
-    const hourlyData: HourlyForecast[] = data.list.slice(0, 8).map((item: any) => {
-      const date = new Date(item.dt * 1000);
+
+    // Process the hourly forecast data (first 24 hours)
+    const hourlyData: HourlyForecast[] = data.forecast.forecastday[0].hour.map((item: any) => {
+      const date = new Date(item.time);
       return {
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true }),
-        temperature: Math.round(item.main.temp),
-        humidity: item.main.humidity,
-        condition: mapWeatherCondition(item.weather[0].id),
-        icon: item.weather[0].icon,
+        temperature: Math.round(item.temp_c),
+        humidity: item.humidity,
+        condition: mapWeatherCondition(item.condition.code, item.condition.text),
+        icon: `https:${item.condition.icon}`,
       };
     });
-    
+
     return hourlyData;
   } catch (error) {
     console.error('Error fetching hourly forecast:', error);
@@ -238,51 +222,179 @@ export const fetchHourlyForecast = async (location: LocationData): Promise<Hourl
   }
 };
 
-// Function to fetch historical weather data
-export const fetchHistoricalWeather = async (
-  location: LocationData, 
-  startDate: Date, 
-  endDate: Date
-): Promise<HistoricalWeather[]> => {
+// Weather alert interface
+export interface WeatherAlert {
+  headline: string;
+  severity: string;
+  urgency: string;
+  areas: string;
+  category: string;
+  event: string;
+  effective: string;
+  expires: string;
+  description: string;
+  instruction: string;
+}
+
+// Historical weather interface
+export interface HistoricalWeather {
+  date: string;
+  temperature: {
+    avg: number;
+    min: number;
+    max: number;
+  };
+  humidity: number;
+  condition: WeatherCondition;
+  precipitation: number;
+  icon: string;
+}
+
+// Weather statistics interface
+export interface WeatherStatistics {
+  temperature: {
+    avg: number;
+    min: number;
+    max: number;
+  };
+  precipitation: {
+    total: number;
+    daysWithRain: number;
+  };
+  humidity: {
+    avg: number;
+  };
+  windSpeed: {
+    avg: number;
+    max: number;
+  };
+  period: {
+    start: string;
+    end: string;
+  };
+}
+
+// Map WeatherAPI.com alert severity to our alert level
+export const mapAlertSeverity = (severity: string): 'warning' | 'severe' | 'emergency' => {
+  switch (severity.toLowerCase()) {
+    case 'moderate':
+      return 'warning';
+    case 'severe':
+      return 'severe';
+    case 'extreme':
+      return 'emergency';
+    default:
+      return 'warning';
+  }
+};
+
+// Function to fetch weather alerts
+export const fetchWeatherAlerts = async (location: LocationData): Promise<WeatherAlert[]> => {
   try {
-    // Convert dates to Unix timestamps (seconds)
-    const startUnix = Math.floor(startDate.getTime() / 1000);
-    const endUnix = Math.floor(endDate.getTime() / 1000);
-    
-    const response = await fetch(
-      `https://history.openweathermap.org/data/2.5/history/city?lat=${location.latitude}&lon=${location.longitude}&type=hour&start=${startUnix}&end=${endUnix}&units=metric&appid=${API_KEY}`
-    );
+    console.log('Fetching weather alerts for location:', location);
+
+    const url = `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no&alerts=yes`;
+    console.log('Weather alerts API URL:', url);
+
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error('Failed to fetch historical weather data');
+      console.error('Failed to fetch weather alerts, status:', response.status);
+      throw new Error('Failed to fetch weather alerts');
     }
 
     const data = await response.json();
-    
-    // Map API response to our HistoricalWeather interface
-    const historicalData: HistoricalWeather[] = data.list.map((item: any) => {
-      const date = new Date(item.dt * 1000);
-      return {
-        date: date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        temperature: Math.round(item.main.temp),
-        humidity: item.main.humidity,
-        windSpeed: item.wind?.speed ? Math.round(item.wind.speed) : 0,
-        pressure: item.main.pressure,
-        condition: mapWeatherCondition(item.weather[0].id),
-        description: item.weather[0].description,
-        icon: item.weather[0].icon
-      };
-    });
+    console.log('Weather API response received');
+
+    // Check if alerts exist
+    if (!data.alerts || !data.alerts.alert || data.alerts.alert.length === 0) {
+      console.log('No weather alerts found from WeatherAPI.com');
+      return [];
+    }
+
+    console.log('Weather alerts found:', data.alerts.alert);
+
+    // Process the alerts data
+    const alertsData: WeatherAlert[] = data.alerts.alert.map((item: any) => ({
+      headline: item.headline || '',
+      severity: item.severity || '',
+      urgency: item.urgency || '',
+      areas: item.areas || '',
+      category: item.category || '',
+      event: item.event || '',
+      effective: item.effective || '',
+      expires: item.expires || '',
+      description: item.desc || '',
+      instruction: item.instruction || '',
+    }));
+
+    return alertsData;
+  } catch (error) {
+    console.error('Error fetching weather alerts:', error);
+    throw error;
+  }
+};
+
+// Function to format date for WeatherAPI.com (YYYY-MM-DD format)
+const formatDateForAPI = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+// Function to fetch historical weather data
+export const fetchHistoricalWeather = async (
+  location: LocationData,
+  startDate: Date,
+  endDate: Date
+): Promise<HistoricalWeather[]> => {
+  try {
+    // WeatherAPI.com allows fetching historical data one day at a time
+    // We'll need to make multiple requests if the date range is more than one day
+    const days: Date[] = [];
+    let currentDate = new Date(startDate);
+
+    // Create an array of dates to fetch
+    while (currentDate <= endDate) {
+      days.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Fetch historical data for each day
+    const historicalData: HistoricalWeather[] = [];
+
+    for (const day of days) {
+      const formattedDate = formatDateForAPI(day);
+      const response = await fetch(
+        `${API_BASE_URL}/history.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&dt=${formattedDate}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch historical weather for ${formattedDate}`);
+      }
+
+      const data = await response.json();
+
+      // Process the historical data
+      if (data.forecast && data.forecast.forecastday && data.forecast.forecastday.length > 0) {
+        const dayData = data.forecast.forecastday[0];
+
+        historicalData.push({
+          date: new Date(dayData.date).toLocaleDateString('en-US'),
+          temperature: {
+            avg: Math.round(dayData.day.avgtemp_c),
+            min: Math.round(dayData.day.mintemp_c),
+            max: Math.round(dayData.day.maxtemp_c),
+          },
+          humidity: dayData.day.avghumidity,
+          condition: mapWeatherCondition(dayData.day.condition.code, dayData.day.condition.text),
+          precipitation: dayData.day.totalprecip_mm,
+          icon: `https:${dayData.day.condition.icon}`,
+        });
+      }
+    }
 
     return historicalData;
   } catch (error) {
-    console.error('Error fetching historical weather data:', error);
+    console.error('Error fetching historical weather:', error);
     throw error;
   }
 };
@@ -294,53 +406,61 @@ export const fetchWeatherStatistics = async (
   endDate: Date
 ): Promise<WeatherStatistics> => {
   try {
-    // First fetch the historical data to compute statistics
+    // Fetch historical data for the period
     const historicalData = await fetchHistoricalWeather(location, startDate, endDate);
-    
-    // Calculate statistics
+
+    // Calculate statistics from historical data
     let totalTemp = 0;
     let minTemp = Infinity;
     let maxTemp = -Infinity;
     let totalHumidity = 0;
-    let totalPressure = 0;
-    const conditionCounts: Record<WeatherCondition, number> = {
-      sunny: 0,
-      cloudy: 0,
-      rainy: 0,
-      windy: 0,
-      stormy: 0,
-      snowy: 0
-    };
+    let totalPrecipitation = 0;
+    let daysWithRain = 0;
+    let totalWindSpeed = 0;
+    let maxWindSpeed = 0;
 
-    historicalData.forEach(data => {
-      totalTemp += data.temperature;
-      minTemp = Math.min(minTemp, data.temperature);
-      maxTemp = Math.max(maxTemp, data.temperature);
-      totalHumidity += data.humidity;
-      totalPressure += data.pressure;
-      conditionCounts[data.condition]++;
+    historicalData.forEach(day => {
+      // Temperature
+      totalTemp += day.temperature.avg;
+      minTemp = Math.min(minTemp, day.temperature.min);
+      maxTemp = Math.max(maxTemp, day.temperature.max);
+
+      // Humidity
+      totalHumidity += day.humidity;
+
+      // Precipitation
+      totalPrecipitation += day.precipitation;
+      if (day.precipitation > 0) {
+        daysWithRain++;
+      }
     });
 
-    // Find predominant condition
-    let predominantCondition: WeatherCondition = 'sunny';
-    let maxCount = 0;
-    for (const [condition, count] of Object.entries(conditionCounts) as [WeatherCondition, number][]) {
-      if (count > maxCount) {
-        maxCount = count;
-        predominantCondition = condition;
-      }
-    }
+    // Calculate averages
+    const avgTemp = historicalData.length > 0 ? totalTemp / historicalData.length : 0;
+    const avgHumidity = historicalData.length > 0 ? totalHumidity / historicalData.length : 0;
+    const avgWindSpeed = historicalData.length > 0 ? totalWindSpeed / historicalData.length : 0;
 
-    const count = historicalData.length || 1; // Avoid division by zero
-    
     return {
-      period: `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
-      avgTemperature: Math.round(totalTemp / count),
-      minTemperature: Math.round(minTemp),
-      maxTemperature: Math.round(maxTemp),
-      avgHumidity: Math.round(totalHumidity / count),
-      avgPressure: Math.round(totalPressure / count),
-      predominantCondition
+      temperature: {
+        avg: Math.round(avgTemp),
+        min: Math.round(minTemp === Infinity ? 0 : minTemp),
+        max: Math.round(maxTemp === -Infinity ? 0 : maxTemp),
+      },
+      precipitation: {
+        total: Math.round(totalPrecipitation),
+        daysWithRain,
+      },
+      humidity: {
+        avg: Math.round(avgHumidity),
+      },
+      windSpeed: {
+        avg: Math.round(avgWindSpeed),
+        max: Math.round(maxWindSpeed),
+      },
+      period: {
+        start: startDate.toLocaleDateString('en-US'),
+        end: endDate.toLocaleDateString('en-US'),
+      },
     };
   } catch (error) {
     console.error('Error calculating weather statistics:', error);

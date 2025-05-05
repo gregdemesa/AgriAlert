@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useAuth } from './AuthContext';
 import { useWeather } from './WeatherContext';
 import { sendWeatherAlertEmail } from './emailService';
+import { mapAlertSeverity, WeatherAlert } from './weatherApi';
 import {
   doc,
   getDoc,
@@ -50,7 +51,7 @@ const AlertContext = createContext<AlertContextType | undefined>(undefined);
 // Provider component
 export const AlertProvider = ({ children }: { children: ReactNode }) => {
   const { currentUser } = useAuth();
-  const { currentWeather, forecast } = useWeather();
+  const { currentWeather, forecast, weatherAlerts } = useWeather();
   const [currentAlerts, setCurrentAlerts] = useState<Alert[]>([]);
   const [pastAlerts, setPastAlerts] = useState<Alert[]>([]);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
@@ -165,56 +166,80 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
 
   // Generate weather alerts based on current weather and forecast
   useEffect(() => {
-    if (!currentWeather.data || !forecast.data || !currentUser) return;
+    if (!currentUser) return;
 
     const generateWeatherAlerts = async () => {
       try {
         const newAlerts: Omit<Alert, 'id'>[] = [];
 
-        // Check for extreme temperatures
-        if (currentWeather.data.temperature > 35) {
-          newAlerts.push({
-            title: 'Extreme Heat Warning',
-            description: `Current temperature is ${currentWeather.data.temperature}°C. Take measures to protect crops from heat stress.`,
-            level: 'severe',
-            time: new Date().toLocaleString(),
-            read: false,
-            userId: currentUser.uid,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
+        // Check if we have weather alerts from the API
+        if (weatherAlerts.data && weatherAlerts.data.length > 0) {
+          console.log('Processing weather alerts from API:', weatherAlerts.data);
+          // Process each weather alert from the API
+          weatherAlerts.data.forEach((alert: WeatherAlert) => {
+            newAlerts.push({
+              title: alert.headline || alert.event,
+              description: alert.description || `Weather alert for ${alert.areas}: ${alert.event}`,
+              level: mapAlertSeverity(alert.severity || 'warning'),
+              time: new Date().toLocaleString(),
+              read: false,
+              userId: currentUser.uid,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now()
+            });
           });
-        }
+        } else {
+          console.log('No weather alerts from API, using fallback logic');
+          // Fallback to generating alerts based on current weather conditions
+          if (currentWeather.data) {
+            // Check for extreme temperatures
+            if (currentWeather.data.temperature > 35) {
+              newAlerts.push({
+                title: 'Extreme Heat Warning',
+                description: `Current temperature is ${currentWeather.data.temperature}°C. Take measures to protect crops from heat stress.`,
+                level: 'severe',
+                time: new Date().toLocaleString(),
+                read: false,
+                userId: currentUser.uid,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+              });
+            }
 
-        // Check for heavy rainfall in forecast
-        const heavyRainForecast = forecast.data.find(day =>
-          day.precipitation > 70
-        );
+            // Check for strong winds
+            if (currentWeather.data.windSpeed > 30) {
+              newAlerts.push({
+                title: 'Strong Wind Alert',
+                description: `Current wind speed is ${currentWeather.data.windSpeed} km/h. Secure structures and protect sensitive crops.`,
+                level: 'emergency',
+                time: new Date().toLocaleString(),
+                read: false,
+                userId: currentUser.uid,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+              });
+            }
+          }
 
-        if (heavyRainForecast) {
-          newAlerts.push({
-            title: 'Heavy Rainfall Expected',
-            description: `Heavy rainfall expected on ${heavyRainForecast.day} with ${heavyRainForecast.precipitation}% probability. Prepare drainage systems.`,
-            level: 'warning',
-            time: new Date().toLocaleString(),
-            read: false,
-            userId: currentUser.uid,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-          });
-        }
+          // Check for heavy rainfall in forecast
+          if (forecast.data) {
+            const heavyRainForecast = forecast.data.find(day =>
+              day.precipitation > 70
+            );
 
-        // Check for strong winds
-        if (currentWeather.data.windSpeed > 30) {
-          newAlerts.push({
-            title: 'Strong Wind Alert',
-            description: `Current wind speed is ${currentWeather.data.windSpeed} km/h. Secure structures and protect sensitive crops.`,
-            level: 'emergency',
-            time: new Date().toLocaleString(),
-            read: false,
-            userId: currentUser.uid,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-          });
+            if (heavyRainForecast) {
+              newAlerts.push({
+                title: 'Heavy Rainfall Expected',
+                description: `Heavy rainfall expected on ${heavyRainForecast.day} with ${heavyRainForecast.precipitation}% probability. Prepare drainage systems.`,
+                level: 'warning',
+                time: new Date().toLocaleString(),
+                read: false,
+                userId: currentUser.uid,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+              });
+            }
+          }
         }
 
         // Save new alerts to Firebase
@@ -275,7 +300,7 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
     };
 
     generateWeatherAlerts();
-  }, [currentWeather.data, forecast.data, emailNotificationsEnabled, currentUser]);
+  }, [currentWeather.data, forecast.data, weatherAlerts.data, emailNotificationsEnabled, currentUser]);
 
   // Mark an alert as read
   const markAlertAsRead = async (alertId: string) => {

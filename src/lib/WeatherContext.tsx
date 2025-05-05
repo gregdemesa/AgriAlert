@@ -7,11 +7,13 @@ import {
   fetchHourlyForecast,
   fetchHistoricalWeather,
   fetchWeatherStatistics,
+  fetchWeatherAlerts,
   CurrentWeather,
   ForecastDay,
   HourlyForecast,
   HistoricalWeather,
-  WeatherStatistics
+  WeatherStatistics,
+  WeatherAlert
 } from './weatherApi';
 
 // Define the context type
@@ -48,6 +50,12 @@ interface WeatherContextType {
     refetch: () => void;
     fetchData: (startDate: Date, endDate: Date) => void;
   };
+  weatherAlerts: {
+    data: WeatherAlert[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => void;
+  };
 }
 
 // Create the context with default values
@@ -65,13 +73,13 @@ export const useWeather = () => {
 // Weather Provider component
 export const WeatherProvider = ({ children }: { children: ReactNode }) => {
   const { location } = useLocation();
-  
+
   // State for date ranges for historical queries
   const [historicalDates, setHistoricalDates] = useState({
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Default: 7 days ago
     endDate: new Date() // Default: today
   });
-  
+
   const [statisticsDates, setStatisticsDates] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Default: 30 days ago
     endDate: new Date() // Default: today
@@ -124,7 +132,7 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
     retry: 3, // Retry failed requests 3 times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
-  
+
   // Query for historical weather data
   const {
     data: historicalData,
@@ -134,8 +142,8 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
   } = useQuery({
     queryKey: ['historicalWeather', location?.latitude, location?.longitude, historicalDates.startDate, historicalDates.endDate],
     queryFn: () => (
-      location 
-        ? fetchHistoricalWeather(location, historicalDates.startDate, historicalDates.endDate) 
+      location
+        ? fetchHistoricalWeather(location, historicalDates.startDate, historicalDates.endDate)
         : Promise.reject('No location available')
     ),
     enabled: !!location && !!historicalDates.startDate && !!historicalDates.endDate,
@@ -143,8 +151,8 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
     retry: 3, // Retry failed requests 3 times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
-  
-  // Query for weather statistics 
+
+  // Query for weather statistics
   const {
     data: statisticsData,
     isLoading: isStatisticsLoading,
@@ -153,8 +161,8 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
   } = useQuery({
     queryKey: ['weatherStatistics', location?.latitude, location?.longitude, statisticsDates.startDate, statisticsDates.endDate],
     queryFn: () => (
-      location 
-        ? fetchWeatherStatistics(location, statisticsDates.startDate, statisticsDates.endDate) 
+      location
+        ? fetchWeatherStatistics(location, statisticsDates.startDate, statisticsDates.endDate)
         : Promise.reject('No location available')
     ),
     enabled: !!location && !!statisticsDates.startDate && !!statisticsDates.endDate,
@@ -163,11 +171,27 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
+  // Query for weather alerts
+  const {
+    data: alertsData,
+    isLoading: isAlertsLoading,
+    error: alertsError,
+    refetch: refetchAlerts,
+  } = useQuery({
+    queryKey: ['weatherAlerts', location?.latitude, location?.longitude],
+    queryFn: () => (location ? fetchWeatherAlerts(location) : Promise.reject('No location available')),
+    enabled: !!location,
+    refetchInterval: 1000 * 60 * 15, // Refetch every 15 minutes
+    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+    retry: 3, // Retry failed requests 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+  });
+
   // Functions to fetch data with specific date ranges
   const fetchHistoricalWithDates = (startDate: Date, endDate: Date) => {
     setHistoricalDates({ startDate, endDate });
   };
-  
+
   const fetchStatisticsWithDates = (startDate: Date, endDate: Date) => {
     setStatisticsDates({ startDate, endDate });
   };
@@ -204,6 +228,12 @@ export const WeatherProvider = ({ children }: { children: ReactNode }) => {
       error: statisticsError as Error | null,
       refetch: refetchStatistics,
       fetchData: fetchStatisticsWithDates,
+    },
+    weatherAlerts: {
+      data: alertsData,
+      isLoading: isAlertsLoading,
+      error: alertsError as Error | null,
+      refetch: refetchAlerts,
     },
   };
 
