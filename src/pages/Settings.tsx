@@ -8,12 +8,17 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/AuthContext";
+import { useLocation } from "@/lib/LocationContext";
 import { useToast } from "@/components/ui/use-toast";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { LocationDisplay } from "@/components/location/LocationDisplay";
+import { LocationRequest } from "@/components/location/LocationRequest";
 
 const Settings = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { location, permissionStatus } = useLocation();
+  const [showLocationRequest, setShowLocationRequest] = useState(false);
 
   // User profile state
   const [firstName, setFirstName] = useState("");
@@ -21,6 +26,9 @@ const Settings = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState(""); // Leave blank if not available
   const [isLoading, setIsLoading] = useState(false);
+
+  // We no longer need to show the location request component
+  // as it's now handled at the app level
 
   // Notification settings
   const [notifications, setNotifications] = useState({
@@ -297,6 +305,12 @@ const Settings = () => {
               <CardTitle>Farm Location</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {location && (
+                <div className="mb-4">
+                  <LocationDisplay />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="farmName">Farm Name</Label>
                 <Input id="farmName" placeholder="Enter farm name" />
@@ -321,7 +335,17 @@ const Settings = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="coordinates">GPS Coordinates</Label>
-                <Input id="coordinates" placeholder="Latitude, Longitude" />
+                <Input
+                  id="coordinates"
+                  placeholder="Latitude, Longitude"
+                  value={location ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}` : ""}
+                  readOnly={!!location}
+                />
+                {!location && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use the "Get Current Location" button above to automatically fill this field.
+                  </p>
+                )}
               </div>
               <Button>Save Location</Button>
             </CardContent>

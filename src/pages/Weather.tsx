@@ -1,27 +1,37 @@
 
+import { useState, useEffect } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from "recharts";
+import { useLocation } from "@/lib/LocationContext";
+import { LocationRequest } from "@/components/location/LocationRequest";
+import { LocationDisplay } from "@/components/location/LocationDisplay";
 
 const Weather = () => {
-  // Mock data for current weather
+  const { location, permissionStatus } = useLocation();
+  const [showLocationRequest, setShowLocationRequest] = useState(false);
+
+  // We no longer need to show the location request component
+  // as it's now handled at the app level
+
+  // Mock data for current weather - in a real app, this would use the location data
   const weatherData = {
     temperature: 28,
     condition: "sunny" as const,
     humidity: 65,
     windSpeed: 12,
-    location: "Manila, Philippines",
+    location: location ? `Your Location (${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)})` : "Manila, Philippines",
   };
 
   // Mock data for forecast
@@ -94,6 +104,12 @@ const Weather = () => {
           Track current conditions and forecasts to plan your farming activities.
         </p>
       </div>
+
+      {location && (
+        <div className="mb-4">
+          <LocationDisplay compact />
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <WeatherCard weather={weatherData} />

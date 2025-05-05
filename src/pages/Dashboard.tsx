@@ -1,18 +1,27 @@
 
+import { useState, useEffect } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { AlertCard } from "@/components/dashboard/AlertCard";
 import { RecommendationsCard } from "@/components/dashboard/RecommendationsCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { PlantingCard } from "@/components/dashboard/PlantingCard";
+import { useLocation } from "@/lib/LocationContext";
+import { LocationRequest } from "@/components/location/LocationRequest";
 
 const Dashboard = () => {
+  const { location, permissionStatus } = useLocation();
+  const [showLocationRequest, setShowLocationRequest] = useState(false);
+
+  // We no longer need to show the location request component
+  // as it's now handled at the app level
+
   // Mock data for weather
   const weatherData = {
     temperature: 28,
     condition: "sunny" as const,
     humidity: 65,
     windSpeed: 12,
-    location: "Manila, Philippines",
+    location: location ? `Your Location (${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)})` : "Manila, Philippines",
   };
 
   // Mock data for alerts
@@ -129,6 +138,8 @@ const Dashboard = () => {
           Monitor weather conditions, receive alerts, and get AI-powered recommendations for your crops.
         </p>
       </div>
+
+      {/* Location request is now handled at the app level */}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <WeatherCard weather={weatherData} />

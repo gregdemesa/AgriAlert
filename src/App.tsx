@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./lib/AuthContext";
+import { LocationProvider } from "./lib/LocationContext";
+import { LocationInitializer } from "./components/location/LocationInitializer";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
@@ -23,32 +25,36 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+      <LocationProvider>
+        {/* This component automatically requests location permission when the app loads */}
+        <LocationInitializer />
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
 
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/weather" element={<Weather />} />
-                <Route path="/planting" element={<PlantingSchedule />} />
-                <Route path="/advisor" element={<AIAdvisor />} />
-                <Route path="/settings" element={<Settings />} />
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/weather" element={<Weather />} />
+                  <Route path="/planting" element={<PlantingSchedule />} />
+                  <Route path="/advisor" element={<AIAdvisor />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* Fallback routes */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+              {/* Fallback routes */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </LocationProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
