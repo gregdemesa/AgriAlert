@@ -38,6 +38,7 @@ export const generateChatResponse = async (
     prompt += 'Format your responses in a well-structured way using Markdown formatting. Use headings, bullet points, and emphasis where appropriate. ';
     prompt += 'Start with a friendly greeting, then provide your advice in a clear, organized manner. ';
     prompt += 'Use bullet points (*) for lists and recommendations. Use bold (**text**) for important points or headings.\n\n';
+    prompt += 'ALWAYS respond in Tagalog (Filipino) language. If the user asks a question in English, translate it to Tagalog in your mind first, then respond in Tagalog.\n\n';
 
     // Add context about location and weather if available
     if (location && weather) {
@@ -128,6 +129,7 @@ export const generateImageResponse = async (
     prompt += 'Format your responses in a well-structured way using Markdown formatting. Use headings, bullet points, and emphasis where appropriate. ';
     prompt += 'Start with a friendly greeting, then provide your analysis of the image in a clear, organized manner. ';
     prompt += 'Use bullet points (*) for lists and recommendations. Use bold (**text**) for important points or headings.\n\n';
+    prompt += 'ALWAYS respond in Tagalog (Filipino) language. If the user asks a question in English, translate it to Tagalog in your mind first, then respond in Tagalog.\n\n';
 
     if (location && weather) {
       prompt += `The user is located in ${weather.location} where the current weather is ${weather.description} with a temperature of ${weather.temperature}°C.\n\n`;

@@ -249,35 +249,35 @@ const AIAdvisor = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
-                onClick={() => handleQuickTopic("Can you help me identify common pests in rice crops?")}
+                onClick={() => handleQuickTopic("Maaari mo ba akong tulungan na kilalanin ang mga karaniwang peste sa mga pananim ng palay?")}
               >
                 Pest identification
               </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
-                onClick={() => handleQuickTopic("What are the best practices for managing crop diseases in wet conditions?")}
+                onClick={() => handleQuickTopic("Ano ang mga pinakamahusay na kasanayan para sa pamamahala ng mga sakit ng pananim sa mga basang kondisyon?")}
               >
                 Disease management
               </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
-                onClick={() => handleQuickTopic("How can I adapt my farming practices to the current weather forecast?")}
+                onClick={() => handleQuickTopic("Paano ko maaaring iakma ang aking mga kasanayan sa pagsasaka sa kasalukuyang pagtataya ng panahon?")}
               >
                 Weather adaptation
               </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
-                onClick={() => handleQuickTopic("What fertilizers would you recommend for my crops based on local conditions?")}
+                onClick={() => handleQuickTopic("Anong mga pataba ang irerekomenda mo para sa aking mga pananim batay sa lokal na kondisyon?")}
               >
                 Fertilizer recommendations
               </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start text-left"
-                onClick={() => handleQuickTopic("Can you suggest an optimal irrigation schedule for my crops?")}
+                onClick={() => handleQuickTopic("Maaari ka bang magmungkahi ng pinakamainam na iskedyul ng patubig para sa aking mga pananim?")}
               >
                 Irrigation scheduling
               </Button>

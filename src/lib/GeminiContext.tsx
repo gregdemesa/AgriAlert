@@ -30,7 +30,7 @@ export const GeminiProvider = ({ children }: { children: ReactNode }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       type: 'ai',
-      content: '# Welcome to AgriAlert AI Advisor! 👋\n\nI\'m here to provide personalized agricultural advice based on your location, weather conditions, and crop needs.\n\n**How can I help you today?**\n\n* Ask about crop management\n* Get pest and disease identification\n* Receive weather-based recommendations\n* Upload photos for analysis\n* Get planting and harvesting advice',
+      content: '# Maligayang pagdating sa AgriAlert AI Advisor! 👋\n\nNarito ako para magbigay ng personalized na payo sa agrikultura batay sa iyong lokasyon, kondisyon ng panahon, at pangangailangan ng pananim.\n\n**Paano kita matutulungan ngayon?**\n\n* Magtanong tungkol sa pamamahala ng pananim\n* Kumuha ng pagkakakilanlan ng peste at sakit\n* Tumanggap ng mga rekomendasyon batay sa panahon\n* Mag-upload ng mga larawan para sa pagsusuri\n* Kumuha ng payo sa pagtatanim at pag-aani',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -133,7 +133,7 @@ export const GeminiProvider = ({ children }: { children: ReactNode }) => {
     setChatHistory([
       {
         type: 'ai',
-        content: '# Welcome to AgriAlert AI Advisor! 👋\n\nI\'m here to provide personalized agricultural advice based on your location, weather conditions, and crop needs.\n\n**How can I help you today?**\n\n* Ask about crop management\n* Get pest and disease identification\n* Receive weather-based recommendations\n* Upload photos for analysis\n* Get planting and harvesting advice',
+        content: '# Maligayang pagdating sa AgriAlert AI Advisor! 👋\n\nNarito ako para magbigay ng personalized na payo sa agrikultura batay sa iyong lokasyon, kondisyon ng panahon, at pangangailangan ng pananim.\n\n**Paano kita matutulungan ngayon?**\n\n* Magtanong tungkol sa pamamahala ng pananim\n* Kumuha ng pagkakakilanlan ng peste at sakit\n* Tumanggap ng mga rekomendasyon batay sa panahon\n* Mag-upload ng mga larawan para sa pagsusuri\n* Kumuha ng payo sa pagtatanim at pag-aani',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
