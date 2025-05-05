@@ -1,7 +1,8 @@
-
 import { useState } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
+import { HistoricalWeatherCard } from "@/components/weather/HistoricalWeatherCard";
+import { WeatherStatisticsCard } from "@/components/weather/WeatherStatisticsCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -67,10 +68,13 @@ const Weather = () => {
       </div>
 
       <Tabs defaultValue="hourly">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="hourly">Hourly Forecast</TabsTrigger>
           <TabsTrigger value="rainfall">Rainfall Analysis</TabsTrigger>
+          <TabsTrigger value="historical">Historical Data</TabsTrigger>
+          <TabsTrigger value="statistics">Weather Statistics</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="hourly" className="pt-4">
           <Card>
             <CardHeader>
@@ -126,6 +130,7 @@ const Weather = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
         <TabsContent value="rainfall" className="pt-4">
           <Card>
             <CardHeader>
@@ -165,6 +170,14 @@ const Weather = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="historical" className="pt-4">
+          <HistoricalWeatherCard />
+        </TabsContent>
+        
+        <TabsContent value="statistics" className="pt-4">
+          <WeatherStatisticsCard />
         </TabsContent>
       </Tabs>
     </div>

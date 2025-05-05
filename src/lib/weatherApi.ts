@@ -78,6 +78,29 @@ export interface HourlyForecast {
   icon: string;
 }
 
+// Historical weather data interface
+export interface HistoricalWeather {
+  date: string;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  pressure: number;
+  condition: WeatherCondition;
+  description: string;
+  icon: string;
+}
+
+// Statistics data interface
+export interface WeatherStatistics {
+  period: string;
+  avgTemperature: number;
+  minTemperature: number;
+  maxTemperature: number;
+  avgHumidity: number;
+  avgPressure: number;
+  predominantCondition: WeatherCondition;
+}
+
 // Function to fetch current weather
 export const fetchCurrentWeather = async (location: LocationData): Promise<CurrentWeather> => {
   try {
@@ -211,6 +234,116 @@ export const fetchHourlyForecast = async (location: LocationData): Promise<Hourl
     return hourlyData;
   } catch (error) {
     console.error('Error fetching hourly forecast:', error);
+    throw error;
+  }
+};
+
+// Function to fetch historical weather data
+export const fetchHistoricalWeather = async (
+  location: LocationData, 
+  startDate: Date, 
+  endDate: Date
+): Promise<HistoricalWeather[]> => {
+  try {
+    // Convert dates to Unix timestamps (seconds)
+    const startUnix = Math.floor(startDate.getTime() / 1000);
+    const endUnix = Math.floor(endDate.getTime() / 1000);
+    
+    const response = await fetch(
+      `https://history.openweathermap.org/data/2.5/history/city?lat=${location.latitude}&lon=${location.longitude}&type=hour&start=${startUnix}&end=${endUnix}&units=metric&appid=${API_KEY}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch historical weather data');
+    }
+
+    const data = await response.json();
+    
+    // Map API response to our HistoricalWeather interface
+    const historicalData: HistoricalWeather[] = data.list.map((item: any) => {
+      const date = new Date(item.dt * 1000);
+      return {
+        date: date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        temperature: Math.round(item.main.temp),
+        humidity: item.main.humidity,
+        windSpeed: item.wind?.speed ? Math.round(item.wind.speed) : 0,
+        pressure: item.main.pressure,
+        condition: mapWeatherCondition(item.weather[0].id),
+        description: item.weather[0].description,
+        icon: item.weather[0].icon
+      };
+    });
+
+    return historicalData;
+  } catch (error) {
+    console.error('Error fetching historical weather data:', error);
+    throw error;
+  }
+};
+
+// Function to fetch weather statistics
+export const fetchWeatherStatistics = async (
+  location: LocationData,
+  startDate: Date,
+  endDate: Date
+): Promise<WeatherStatistics> => {
+  try {
+    // First fetch the historical data to compute statistics
+    const historicalData = await fetchHistoricalWeather(location, startDate, endDate);
+    
+    // Calculate statistics
+    let totalTemp = 0;
+    let minTemp = Infinity;
+    let maxTemp = -Infinity;
+    let totalHumidity = 0;
+    let totalPressure = 0;
+    const conditionCounts: Record<WeatherCondition, number> = {
+      sunny: 0,
+      cloudy: 0,
+      rainy: 0,
+      windy: 0,
+      stormy: 0,
+      snowy: 0
+    };
+
+    historicalData.forEach(data => {
+      totalTemp += data.temperature;
+      minTemp = Math.min(minTemp, data.temperature);
+      maxTemp = Math.max(maxTemp, data.temperature);
+      totalHumidity += data.humidity;
+      totalPressure += data.pressure;
+      conditionCounts[data.condition]++;
+    });
+
+    // Find predominant condition
+    let predominantCondition: WeatherCondition = 'sunny';
+    let maxCount = 0;
+    for (const [condition, count] of Object.entries(conditionCounts) as [WeatherCondition, number][]) {
+      if (count > maxCount) {
+        maxCount = count;
+        predominantCondition = condition;
+      }
+    }
+
+    const count = historicalData.length || 1; // Avoid division by zero
+    
+    return {
+      period: `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
+      avgTemperature: Math.round(totalTemp / count),
+      minTemperature: Math.round(minTemp),
+      maxTemperature: Math.round(maxTemp),
+      avgHumidity: Math.round(totalHumidity / count),
+      avgPressure: Math.round(totalPressure / count),
+      predominantCondition
+    };
+  } catch (error) {
+    console.error('Error calculating weather statistics:', error);
     throw error;
   }
 };
