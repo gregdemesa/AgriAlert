@@ -27,9 +27,9 @@ const Alerts = () => {
         <TabsContent value="current" className="pt-4">
           {isLoading ? (
             <Card>
-              <CardContent className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              <CardContent className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                <span className="text-muted-foreground">Loading alerts...</span>
               </CardContent>
             </Card>
           ) : (
@@ -39,9 +39,9 @@ const Alerts = () => {
         <TabsContent value="past" className="pt-4">
           {isLoading ? (
             <Card>
-              <CardContent className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              <CardContent className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                <span className="text-muted-foreground">Loading alerts...</span>
               </CardContent>
             </Card>
           ) : (

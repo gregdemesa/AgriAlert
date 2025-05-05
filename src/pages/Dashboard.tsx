@@ -7,8 +7,8 @@ import { PlantingCard } from "@/components/dashboard/PlantingCard";
 import { RecommendationsProvider } from "@/lib/RecommendationsContext";
 import { usePlanting } from "@/lib/PlantingContext";
 import { useAlerts } from "@/lib/AlertContext";
-import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 const Dashboard = () => {
   // Get alerts from context
@@ -31,9 +31,9 @@ const Dashboard = () => {
           <WeatherCard />
           {isLoading ? (
             <Card>
-              <CardContent className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              <CardContent className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                <span className="text-muted-foreground">Loading alerts...</span>
               </CardContent>
             </Card>
           ) : (

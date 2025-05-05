@@ -11,8 +11,11 @@ import { useAuth } from "@/lib/AuthContext";
 import { useLocation } from "@/lib/LocationContext";
 import { useToast } from "@/components/ui/use-toast";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { LocationDisplay } from "@/components/location/LocationDisplay";
 import { EmailNotificationSettings, defaultEmailNotificationSettings } from "@/lib/emailService";
+import { useAlerts } from "@/lib/AlertContext";
 
 const Settings = () => {
   const { currentUser } = useAuth();
@@ -32,6 +35,7 @@ const Settings = () => {
 
   // Email notification settings
   const [emailNotifications, setEmailNotifications] = useState<EmailNotificationSettings>(defaultEmailNotificationSettings);
+  const { emailNotificationsEnabled, setEmailNotificationsEnabled } = useAlerts();
 
   // Load user data when component mounts
   useEffect(() => {
@@ -404,10 +408,8 @@ const Settings = () => {
                 </div>
                 <Switch
                   id="email-notifications"
-                  checked={emailNotifications.enabled}
-                  onCheckedChange={(checked) =>
-                    setEmailNotifications({ ...emailNotifications, enabled: checked })
-                  }
+                  checked={emailNotificationsEnabled}
+                  onCheckedChange={setEmailNotificationsEnabled}
                 />
               </div>
               <Separator />
@@ -417,7 +419,8 @@ const Settings = () => {
                   <Label htmlFor="weather-alerts">Weather Alerts</Label>
                   <Switch
                     id="weather-alerts"
-                    checked={emailNotifications.types.weatherAlerts}
+                    checked={emailNotificationsEnabled && emailNotifications.types.weatherAlerts}
+                    disabled={!emailNotificationsEnabled}
                     onCheckedChange={(checked) =>
                       setEmailNotifications({
                         ...emailNotifications,
@@ -433,7 +436,8 @@ const Settings = () => {
                   <Label htmlFor="harvest-reminders">Harvest Reminders</Label>
                   <Switch
                     id="harvest-reminders"
-                    checked={emailNotifications.types.harvestReminders}
+                    checked={emailNotificationsEnabled && emailNotifications.types.harvestReminders}
+                    disabled={!emailNotificationsEnabled}
                     onCheckedChange={(checked) =>
                       setEmailNotifications({
                         ...emailNotifications,
@@ -449,7 +453,8 @@ const Settings = () => {
                   <Label htmlFor="system-updates">System Updates</Label>
                   <Switch
                     id="system-updates"
-                    checked={emailNotifications.types.systemUpdates}
+                    checked={emailNotificationsEnabled && emailNotifications.types.systemUpdates}
+                    disabled={!emailNotificationsEnabled}
                     onCheckedChange={(checked) =>
                       setEmailNotifications({
                         ...emailNotifications,
@@ -462,7 +467,34 @@ const Settings = () => {
                   />
                 </div>
               </div>
-              <Button className="mt-2">Save Preferences</Button>
+              <Button
+                className="mt-2"
+                onClick={async () => {
+                  try {
+                    // Save notification types to Firebase
+                    if (currentUser) {
+                      const userPrefsRef = doc(db, 'userPreferences', currentUser.uid);
+                      await setDoc(userPrefsRef, {
+                        emailNotificationTypes: emailNotifications.types
+                      }, { merge: true });
+
+                      toast({
+                        title: "Preferences saved",
+                        description: "Your notification preferences have been updated.",
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error saving notification preferences:', error);
+                    toast({
+                      title: "Error",
+                      description: "Failed to save notification preferences.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                Save Preferences
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
