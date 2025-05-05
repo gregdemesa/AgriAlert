@@ -1,18 +1,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRecommendations } from "@/lib/RecommendationsContext";
+import { Loader2 } from "lucide-react";
 
-interface Recommendation {
-  id: string;
-  title: string;
-  description: string;
-  priority: "low" | "medium" | "high";
-}
+export function RecommendationsCard() {
+  const { recommendations } = useRecommendations();
+  const { data, isLoading, error } = recommendations;
 
-interface RecommendationsCardProps {
-  recommendations: Recommendation[];
-}
-
-export function RecommendationsCard({ recommendations }: RecommendationsCardProps) {
   // Function to get priority badge classes
   const getPriorityClass = (priority: string) => {
     switch (priority) {
@@ -28,18 +22,27 @@ export function RecommendationsCard({ recommendations }: RecommendationsCardProp
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="bg-gradient-to-r from-agri-green/20 to-agri-green-light/10 pb-2">
         <CardTitle>AI Recommendations</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        {recommendations.length === 0 ? (
+        {isLoading ? (
+          <div className="px-6 py-8 flex justify-center items-center">
+            <Loader2 className="h-6 w-6 animate-spin text-agri-green mr-2" />
+            <span>Generating recommendations...</span>
+          </div>
+        ) : error ? (
+          <div className="px-6 py-4 text-center text-muted-foreground">
+            Unable to generate recommendations. Please try again later.
+          </div>
+        ) : !data || data.length === 0 ? (
           <div className="px-6 py-4 text-center text-muted-foreground">
             No recommendations available.
           </div>
         ) : (
-          <div className="divide-y">
-            {recommendations.map((rec) => (
+          <div className="divide-y max-h-[400px] overflow-y-auto">
+            {data.map((rec) => (
               <div key={rec.id} className="px-6 py-4">
                 <div className="flex items-start justify-between mb-1">
                   <h4 className="font-medium">{rec.title}</h4>

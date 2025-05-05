@@ -9,6 +9,7 @@ import { AuthProvider } from "./lib/AuthContext";
 import { LocationProvider } from "./lib/LocationContext";
 import { WeatherProvider } from "./lib/WeatherContext";
 import { GeminiProvider } from "./lib/GeminiContext";
+import { PlantingProvider } from "./lib/PlantingContext";
 import { LocationInitializer } from "./components/location/LocationInitializer";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -32,10 +33,11 @@ const App = () => (
         <LocationInitializer />
         <WeatherProvider>
           <GeminiProvider>
-            <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+            <PlantingProvider>
+              <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
@@ -58,6 +60,7 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+          </PlantingProvider>
           </GeminiProvider>
         </WeatherProvider>
       </LocationProvider>

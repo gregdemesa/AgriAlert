@@ -108,6 +108,136 @@ export const generateChatResponse = async (
 };
 
 // Function to generate a chat response with an image
+// Define the crop type for recommendations
+interface CropForRecommendation {
+  name: string;
+  status?: string;
+  variety?: string;
+  plantingDate?: string;
+  harvestDate?: string;
+}
+
+// Function to generate agricultural recommendations based on weather and location
+export const generateRecommendations = async (
+  location?: LocationData | null,
+  weather?: CurrentWeather | null,
+  forecast?: ForecastDay[] | null,
+  crops?: CropForRecommendation[] | null
+): Promise<{ id: string; title: string; description: string; priority: 'low' | 'medium' | 'high' }[]> => {
+  try {
+    // Build a prompt for generating recommendations
+    let prompt = 'You are an agricultural advisor AI assistant called AgriAlert. ';
+    prompt += 'Generate 3-5 specific, actionable recommendations for farmers based on the current weather conditions, forecast, and crops. ';
+    prompt += 'Each recommendation should have a title, description, and priority level (low, medium, or high).\n\n';
+
+    // Add context about location and weather if available
+    if (location && weather) {
+      prompt += `The user is located in ${weather.location} where the current weather is ${weather.description} with a temperature of ${weather.temperature}°C. `;
+      prompt += `The humidity is ${weather.humidity}%, wind speed is ${weather.windSpeed} m/s, and pressure is ${weather.pressure} hPa.\n\n`;
+    }
+
+    if (forecast && forecast.length > 0) {
+      prompt += 'The weather forecast for the next few days is:\n';
+      forecast.slice(0, 3).forEach(day => {
+        prompt += `${day.day}: ${day.description}, high of ${day.temperature.high}°C, low of ${day.temperature.low}°C, precipitation probability: ${day.precipitation}%.\n`;
+      });
+      prompt += '\n';
+    }
+
+    // Add information about crops if available
+    if (crops && crops.length > 0) {
+      prompt += 'The user has the following crops:\n';
+      crops.forEach(crop => {
+        let cropInfo = `- ${crop.name}`;
+        if (crop.variety) cropInfo += ` (Variety: ${crop.variety})`;
+        if (crop.status) cropInfo += ` (Status: ${crop.status})`;
+        if (crop.plantingDate) cropInfo += ` (Planted: ${crop.plantingDate})`;
+        if (crop.harvestDate) cropInfo += ` (Expected Harvest: ${crop.harvestDate})`;
+        prompt += cropInfo + '\n';
+      });
+      prompt += '\n';
+    }
+
+    prompt += 'Based on this information, provide 3-5 specific recommendations for actions the farmer should take. ';
+    prompt += 'Format your response as a JSON array with objects containing "id", "title", "description", and "priority" fields. ';
+    prompt += 'The priority should be one of: "low", "medium", or "high" based on urgency. ';
+    prompt += 'Make sure the recommendations are specific, actionable, and directly related to the current conditions. ';
+    prompt += 'Example format: [{"id": "1", "title": "Check drainage systems", "description": "Heavy rain expected, ensure all drainage systems are clear to prevent flooding.", "priority": "high"}]\n\n';
+    prompt += 'Return ONLY the JSON array without any additional text or explanation.';
+
+    // Make the API request
+    const response = await fetch(
+      `${API_BASE_URL}/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2, // Lower temperature for more consistent, factual responses
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Gemini API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+
+    // Extract the response text
+    const responseText = data.candidates[0]?.content?.parts[0]?.text || '[]';
+
+    // Parse the JSON response
+    try {
+      // Clean the response text to ensure it's valid JSON
+      const cleanedText = responseText.replace(/```json|```/g, '').trim();
+      const recommendations = JSON.parse(cleanedText);
+
+      // Validate and format the recommendations
+      return recommendations.map((rec: any, index: number) => ({
+        id: rec.id || String(index + 1),
+        title: rec.title || 'Recommendation',
+        description: rec.description || 'No description provided',
+        priority: ['low', 'medium', 'high'].includes(rec.priority) ? rec.priority : 'medium',
+      })).slice(0, 5); // Limit to 5 recommendations
+    } catch (parseError) {
+      console.error('Error parsing recommendations JSON:', parseError);
+      return [
+        {
+          id: '1',
+          title: 'Error generating recommendations',
+          description: 'Unable to generate recommendations based on current data. Please try again later.',
+          priority: 'medium',
+        }
+      ];
+    }
+  } catch (error) {
+    console.error('Error generating recommendations:', error);
+    return [
+      {
+        id: '1',
+        title: 'Error generating recommendations',
+        description: 'Unable to generate recommendations based on current data. Please try again later.',
+        priority: 'medium',
+      }
+    ];
+  }
+};
+
 export const generateImageResponse = async (
   messages: ChatMessage[],
   imageBase64: string,

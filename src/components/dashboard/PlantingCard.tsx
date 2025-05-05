@@ -1,20 +1,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "lucide-react";
-
-interface Crop {
-  id: string;
-  name: string;
-  plantingDate: string;
-  harvestDate: string;
-  status: "upcoming" | "active" | "ready-to-harvest" | "delayed";
-}
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePlanting } from "@/lib/PlantingContext";
+import { ActiveCrop } from "@/lib/plantingService";
+import { Link } from "react-router-dom";
 
 interface PlantingCardProps {
-  crops: Crop[];
+  crops?: ActiveCrop[];
 }
 
-export function PlantingCard({ crops }: PlantingCardProps) {
+export function PlantingCard({ crops: propCrops }: PlantingCardProps) {
+  // Use the crops from context if not provided as prop
+  const { activeCrops } = usePlanting();
+  const cropsData = propCrops || activeCrops.data;
+  const isLoading = !propCrops && activeCrops.isLoading;
   // Function to get status badge classes
   const getStatusClass = (status: string) => {
     switch (status) {
@@ -30,8 +30,9 @@ export function PlantingCard({ crops }: PlantingCardProps) {
         return "bg-gray-100 text-gray-800";
     }
   };
-  
-  const sortedCrops = [...crops].sort((a, b) => {
+
+  // Sort crops by status priority if data is available
+  const sortedCrops = cropsData ? [...cropsData].sort((a, b) => {
     // Sort by status priority: delayed, ready-to-harvest, active, upcoming
     const statusOrder: Record<string, number> = {
       "delayed": 0,
@@ -39,9 +40,39 @@ export function PlantingCard({ crops }: PlantingCardProps) {
       "active": 2,
       "upcoming": 3,
     };
-    
+
     return statusOrder[a.status] - statusOrder[b.status];
-  });
+  }) : [];
+
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="bg-gradient-to-r from-agri-green-light/30 to-agri-green-light/10 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Planting Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <div className="divide-y">
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="px-6 py-3">
+                <div className="flex items-center justify-between mb-1">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -52,7 +83,7 @@ export function PlantingCard({ crops }: PlantingCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        {crops.length === 0 ? (
+        {!cropsData || cropsData.length === 0 ? (
           <div className="px-6 py-4 text-center text-muted-foreground">
             No active crops in your schedule.
           </div>
@@ -72,15 +103,15 @@ export function PlantingCard({ crops }: PlantingCardProps) {
                 </div>
                 <div className="text-sm text-muted-foreground flex justify-between">
                   <span>Planted: {crop.plantingDate}</span>
-                  <span>Harvest: {crop.harvestDate}</span>
+                  <span>Harvest: {crop.expectedHarvest}</span>
                 </div>
               </div>
             ))}
-            {crops.length > 3 && (
+            {cropsData.length > 3 && (
               <div className="px-6 py-2 text-center">
-                <a href="/planting" className="text-sm text-agri-green hover:underline">
-                  View all {crops.length} crops
-                </a>
+                <Link to="/planting" className="text-sm text-agri-green hover:underline">
+                  View all {cropsData.length} crops
+                </Link>
               </div>
             )}
           </div>
