@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./lib/AuthContext";
 import { LocationProvider } from "./lib/LocationContext";
+import { WeatherProvider } from "./lib/WeatherContext";
 import { LocationInitializer } from "./components/location/LocationInitializer";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -28,7 +29,8 @@ const App = () => (
       <LocationProvider>
         {/* This component automatically requests location permission when the app loads */}
         <LocationInitializer />
-        <TooltipProvider>
+        <WeatherProvider>
+          <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -54,6 +56,7 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
+        </WeatherProvider>
       </LocationProvider>
     </AuthProvider>
   </QueryClientProvider>

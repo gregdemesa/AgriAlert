@@ -1,28 +1,14 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { AlertCard } from "@/components/dashboard/AlertCard";
 import { RecommendationsCard } from "@/components/dashboard/RecommendationsCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { PlantingCard } from "@/components/dashboard/PlantingCard";
 import { useLocation } from "@/lib/LocationContext";
-import { LocationRequest } from "@/components/location/LocationRequest";
 
 const Dashboard = () => {
-  const { location, permissionStatus } = useLocation();
-  const [showLocationRequest, setShowLocationRequest] = useState(false);
-
-  // We no longer need to show the location request component
-  // as it's now handled at the app level
-
-  // Mock data for weather
-  const weatherData = {
-    temperature: 28,
-    condition: "sunny" as const,
-    humidity: 65,
-    windSpeed: 12,
-    location: location ? `Your Location (${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)})` : "Manila, Philippines",
-  };
+  const { location } = useLocation();
 
   // Mock data for alerts
   const alertsData = [
@@ -64,39 +50,7 @@ const Dashboard = () => {
     },
   ];
 
-  // Mock data for forecast
-  const forecastData = [
-    {
-      day: "Mon",
-      temperature: { high: 30, low: 24 },
-      condition: "sunny" as const,
-      precipitation: 0,
-    },
-    {
-      day: "Tue",
-      temperature: { high: 29, low: 24 },
-      condition: "cloudy" as const,
-      precipitation: 20,
-    },
-    {
-      day: "Wed",
-      temperature: { high: 26, low: 23 },
-      condition: "rainy" as const,
-      precipitation: 80,
-    },
-    {
-      day: "Thu",
-      temperature: { high: 25, low: 22 },
-      condition: "rainy" as const,
-      precipitation: 70,
-    },
-    {
-      day: "Fri",
-      temperature: { high: 27, low: 23 },
-      condition: "cloudy" as const,
-      precipitation: 30,
-    },
-  ];
+  // We now use real forecast data from the WeatherContext
 
   // Mock data for crops
   const cropsData = [
@@ -142,10 +96,10 @@ const Dashboard = () => {
       {/* Location request is now handled at the app level */}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <WeatherCard weather={weatherData} />
+        <WeatherCard />
         <AlertCard alerts={alertsData} />
         <RecommendationsCard recommendations={recommendationsData} />
-        <ForecastCard forecast={forecastData} />
+        <ForecastCard />
         <PlantingCard crops={cropsData} />
       </div>
     </div>

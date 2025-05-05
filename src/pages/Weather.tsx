@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,70 +15,20 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { useLocation } from "@/lib/LocationContext";
-import { LocationRequest } from "@/components/location/LocationRequest";
+import { useWeather } from "@/lib/WeatherContext";
 import { LocationDisplay } from "@/components/location/LocationDisplay";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Weather = () => {
-  const { location, permissionStatus } = useLocation();
-  const [showLocationRequest, setShowLocationRequest] = useState(false);
+  const { location } = useLocation();
+  const { hourlyForecast } = useWeather();
 
-  // We no longer need to show the location request component
-  // as it's now handled at the app level
-
-  // Mock data for current weather - in a real app, this would use the location data
-  const weatherData = {
-    temperature: 28,
-    condition: "sunny" as const,
-    humidity: 65,
-    windSpeed: 12,
-    location: location ? `Your Location (${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)})` : "Manila, Philippines",
-  };
-
-  // Mock data for forecast
-  const forecastData = [
-    {
-      day: "Mon",
-      temperature: { high: 30, low: 24 },
-      condition: "sunny" as const,
-      precipitation: 0,
-    },
-    {
-      day: "Tue",
-      temperature: { high: 29, low: 24 },
-      condition: "cloudy" as const,
-      precipitation: 20,
-    },
-    {
-      day: "Wed",
-      temperature: { high: 26, low: 23 },
-      condition: "rainy" as const,
-      precipitation: 80,
-    },
-    {
-      day: "Thu",
-      temperature: { high: 25, low: 22 },
-      condition: "rainy" as const,
-      precipitation: 70,
-    },
-    {
-      day: "Fri",
-      temperature: { high: 27, low: 23 },
-      condition: "cloudy" as const,
-      precipitation: 30,
-    },
-  ];
-
-  // Mock data for hourly forecast
-  const hourlyData = [
-    { time: "6AM", temperature: 24, rainfall: 0, humidity: 70 },
-    { time: "9AM", temperature: 26, rainfall: 0, humidity: 65 },
-    { time: "12PM", temperature: 29, rainfall: 0, humidity: 60 },
-    { time: "3PM", temperature: 30, rainfall: 0, humidity: 58 },
-    { time: "6PM", temperature: 28, rainfall: 0, humidity: 62 },
-    { time: "9PM", temperature: 26, rainfall: 0, humidity: 68 },
-    { time: "12AM", temperature: 25, rainfall: 0, humidity: 72 },
-    { time: "3AM", temperature: 24, rainfall: 0, humidity: 75 },
-  ];
+  // Transform hourly forecast data for the chart
+  const hourlyData = hourlyForecast.data?.map(item => ({
+    time: item.time,
+    temperature: item.temperature,
+    humidity: item.humidity
+  })) || [];
 
   // Mock data for monthly rainfall
   const monthlyData = [
@@ -112,8 +62,8 @@ const Weather = () => {
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
-        <WeatherCard weather={weatherData} />
-        <ForecastCard forecast={forecastData} />
+        <WeatherCard />
+        <ForecastCard />
       </div>
 
       <Tabs defaultValue="hourly">
@@ -128,30 +78,50 @@ const Weather = () => {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={hourlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="temperature"
-                      stroke="#F59E0B"
-                      name="Temperature (°C)"
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="humidity"
-                      stroke="#3B82F6"
-                      name="Humidity (%)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {hourlyForecast.isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Skeleton className="h-[250px] w-full" />
+                  </div>
+                ) : hourlyForecast.error ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <p>Error loading hourly forecast data.</p>
+                    <button
+                      onClick={() => hourlyForecast.refetch()}
+                      className="mt-2 text-sm text-primary hover:underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : hourlyData.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    Hourly forecast data unavailable
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={hourlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="temperature"
+                        stroke="#F59E0B"
+                        name="Temperature (°C)"
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="humidity"
+                        stroke="#3B82F6"
+                        name="Humidity (%)"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -163,28 +133,35 @@ const Weather = () => {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="rainfall"
-                      stroke="#3B82F6"
-                      name="Rainfall (mm)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="average"
-                      stroke="#9CA3AF"
-                      strokeDasharray="5 5"
-                      name="Historical Average (mm)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {/* Note: This is still using mock data as OpenWeatherMap's free tier doesn't provide historical rainfall data */}
+                {/* In a production app, you would use a paid weather API that provides historical data */}
+                <div className="flex flex-col items-center justify-center h-full">
+                  <p className="text-muted-foreground mb-4">
+                    Monthly rainfall data requires a premium weather API subscription.
+                  </p>
+                  <ResponsiveContainer width="100%" height="80%">
+                    <LineChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="rainfall"
+                        stroke="#3B82F6"
+                        name="Rainfall (mm) (Sample Data)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="average"
+                        stroke="#9CA3AF"
+                        strokeDasharray="5 5"
+                        name="Historical Average (mm) (Sample Data)"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -32,7 +32,11 @@ export const useLocation = () => {
 
 // Location Provider component
 export const LocationProvider = ({ children }: { children: ReactNode }) => {
-  const [location, setLocation] = useState<LocationData | null>(null);
+  // Initialize location from localStorage if available
+  const [location, setLocation] = useState<LocationData | null>(() => {
+    const savedLocation = localStorage.getItem('userLocation');
+    return savedLocation ? JSON.parse(savedLocation) : null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
@@ -79,6 +83,9 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
 
       setLocation(locationData);
       setLoading(false);
+
+      // Store location in localStorage
+      localStorage.setItem('userLocation', JSON.stringify(locationData));
 
       // Log the location when permission is granted
       console.log('User location approved and logged:', locationData);
@@ -128,6 +135,9 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
 
       setLocation(locationData);
       setLoading(false);
+
+      // Store location in localStorage
+      localStorage.setItem('userLocation', JSON.stringify(locationData));
 
       // Log the location when retrieved
       console.log('User location updated:', locationData);
