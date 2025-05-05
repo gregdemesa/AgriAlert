@@ -77,8 +77,22 @@ export const GeminiProvider = ({ children }: { children: ReactNode }) => {
       // Update chat history with AI response
       setChatHistory(prev => [...prev, aiMessage]);
     } catch (err: any) {
-      setError(err.message || 'An error occurred while sending your message');
+      const errorMessage = err.message || 'An error occurred while sending your message';
+      setError(errorMessage);
       console.error('Error sending message:', err);
+
+      // Add an error message to the chat
+      const errorAiMessage: ChatMessage = {
+        type: 'ai',
+        content: `**Error:** Hindi ko ma-process ang iyong mensahe. ${
+          err.message?.includes('deprecated')
+            ? 'May problema sa API connection. Pakisubukang muli mamaya.'
+            : 'Pakisubukang muli.'
+        }`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setChatHistory(prev => [...prev, errorAiMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +135,22 @@ export const GeminiProvider = ({ children }: { children: ReactNode }) => {
       // Update chat history with AI response
       setChatHistory(prev => [...prev, aiMessage]);
     } catch (err: any) {
-      setError(err.message || 'An error occurred while analyzing your image');
+      const errorMessage = err.message || 'An error occurred while analyzing your image';
+      setError(errorMessage);
       console.error('Error sending image message:', err);
+
+      // Add an error message to the chat
+      const errorAiMessage: ChatMessage = {
+        type: 'ai',
+        content: `**Error:** Hindi ko ma-analyze ang larawan. ${
+          err.message?.includes('deprecated')
+            ? 'May problema sa API connection. Pakisubukang muli mamaya.'
+            : 'Pakisubukang muli o mag-upload ng ibang larawan.'
+        }`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setChatHistory(prev => [...prev, errorAiMessage]);
     } finally {
       setIsLoading(false);
     }

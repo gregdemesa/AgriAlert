@@ -152,7 +152,7 @@ export const generateImageResponse = async (
 
     // Make the API request to the multimodal model
     const response = await fetch(
-      `${API_BASE_URL}/models/gemini-pro-vision:generateContent?key=${API_KEY}`,
+      `${API_BASE_URL}/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
       {
         method: 'POST',
         headers: {

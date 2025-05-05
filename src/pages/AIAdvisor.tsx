@@ -13,8 +13,11 @@ const AIAdvisor = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const dropZoneRef = useRef<HTMLLabelElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
 
   // Use the Gemini context instead of local state
   const { chatHistory, isLoading, sendMessage, sendImageMessage, clearChat } = useGemini();
@@ -74,6 +77,11 @@ const AIAdvisor = () => {
     reader.onload = () => {
       setSelectedImage(reader.result as string);
       setIsUploading(false);
+
+      // Focus the message input after a short delay to allow the UI to update
+      setTimeout(() => {
+        messageInputRef.current?.focus();
+      }, 100);
     };
     reader.onerror = () => {
       console.error('Error reading file');
@@ -90,6 +98,55 @@ const AIAdvisor = () => {
     setSelectedImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle drag events for file upload
+  const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setIsUploading(true);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          setSelectedImage(reader.result as string);
+          setIsUploading(false);
+
+          // Focus the message input after a short delay
+          setTimeout(() => {
+            messageInputRef.current?.focus();
+          }, 100);
+        };
+        reader.onerror = () => {
+          console.error('Error reading file');
+          setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -183,13 +240,16 @@ const AIAdvisor = () => {
           <div className="p-4 border-t">
             {selectedImage && (
               <div className="mb-2 relative">
-                <div className="flex items-center gap-2 p-2 border rounded-md">
+                <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
                   <img
                     src={selectedImage}
                     alt="Selected"
                     className="h-12 w-auto rounded"
                   />
-                  <span className="text-sm truncate flex-1">Image selected</span>
+                  <div className="flex-1">
+                  <span className="text-sm truncate block">Image selected</span>
+                  <span className="text-xs text-muted-foreground">Type your question about this image</span>
+                </div>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -203,6 +263,7 @@ const AIAdvisor = () => {
             )}
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
+                ref={messageInputRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your farming question..."
@@ -295,18 +356,29 @@ const AIAdvisor = () => {
                 </p>
                 <div className="grid gap-2">
                   <label
+                    ref={dropZoneRef}
                     htmlFor="photo-upload-card"
-                    className="cursor-pointer border-2 border-dashed rounded-md p-6 text-center"
+                    className={`cursor-pointer border-2 border-dashed rounded-md p-6 text-center transition-colors ${
+                      isDragging ? 'border-agri-green bg-agri-green/5' : 'border-gray-300'
+                    }`}
                     onClick={() => fileInputRef.current?.click()}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
                   >
                     <div className="flex flex-col items-center gap-2">
                       {isUploading ? (
                         <Loader2 className="h-6 w-6 animate-spin text-agri-green" />
                       ) : (
-                        <ImageIcon className="h-6 w-6 text-agri-green" />
+                        <ImageIcon className={`h-6 w-6 ${isDragging ? 'text-agri-green' : 'text-agri-green/70'}`} />
                       )}
                       <span className="text-sm text-muted-foreground">
-                        {isUploading ? "Uploading..." : "Click to upload a photo"}
+                        {isUploading
+                          ? "Uploading..."
+                          : isDragging
+                            ? "Drop your image here"
+                            : "Drag & drop or click to upload a photo"}
                       </span>
                     </div>
                   </label>
