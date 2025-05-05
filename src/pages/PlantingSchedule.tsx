@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,6 +7,13 @@ import { Calendar, AlertTriangle, Edit, Trash2, MoreHorizontal } from "lucide-re
 import { usePlanting } from "@/lib/PlantingContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import CropForm from "@/components/planting/CropForm";
 import { ActiveCrop, HistoricalCrop } from "@/lib/plantingService";
 
@@ -46,6 +61,44 @@ const PlantingSchedule = () => {
   // State for the delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cropToDelete, setCropToDelete] = useState<string | null>(null);
+
+  // State for the harvest dialog
+  const [harvestDialogOpen, setHarvestDialogOpen] = useState(false);
+  const [cropToHarvest, setCropToHarvest] = useState<ActiveCrop | null>(null);
+  const [harvestDate, setHarvestDate] = useState<Date | undefined>(new Date());
+  const [yieldAmount, setYieldAmount] = useState('');
+  const [harvestNotes, setHarvestNotes] = useState('');
+  const [isHarvestLoading, setIsHarvestLoading] = useState(false);
+
+  // State for tracking the current tab
+  const [currentTab, setCurrentTab] = useState("active");
+
+  // Refetch data when tab changes, with debouncing to prevent excessive API calls
+  useEffect(() => {
+    // Create a debounced refetch function to prevent too many API calls
+    const debouncedRefetch = setTimeout(() => {
+      try {
+        // Only refetch the data for the current tab to reduce Firebase load
+        if (currentTab === 'active') {
+          activeCrops.refetch();
+        } else if (currentTab === 'upcoming') {
+          upcomingCrops.refetch();
+        } else if (currentTab === 'historical') {
+          historicalCrops.refetch();
+        }
+      } catch (error) {
+        console.error("Error refetching data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load data. Please refresh the page.",
+          variant: "destructive",
+        });
+      }
+    }, 300); // 300ms debounce delay
+
+    // Clean up the timeout when the component unmounts or when the tab changes again
+    return () => clearTimeout(debouncedRefetch);
+  }, [currentTab]);
 
   // Function to get status badge classes
   const getStatusClass = (status: string) => {
@@ -90,6 +143,12 @@ const PlantingSchedule = () => {
     if (cropToDelete) {
       try {
         await deleteCrop(cropToDelete);
+
+        // Explicitly refetch all data to ensure the UI is updated
+        activeCrops.refetch();
+        upcomingCrops.refetch();
+        historicalCrops.refetch();
+
         toast({
           title: "Crop deleted",
           description: "The crop has been successfully deleted.",
@@ -108,17 +167,99 @@ const PlantingSchedule = () => {
     }
   };
 
+  // Handle opening the harvest dialog
+  const handleHarvestClick = (crop: ActiveCrop) => {
+    setCropToHarvest(crop);
+    setHarvestDate(new Date());
+    setYieldAmount('');
+    setHarvestNotes('');
+    setHarvestDialogOpen(true);
+  };
+
+  // Confirm harvesting a crop
+  const confirmHarvest = async () => {
+    if (cropToHarvest && harvestDate) {
+      try {
+        setIsHarvestLoading(true);
+        await markCropAsHarvested(
+          cropToHarvest.id!,
+          format(harvestDate, 'MMM d, yyyy'),
+          yieldAmount || 'Not recorded',
+          harvestNotes
+        );
+
+        // Switch to historical tab
+        setCurrentTab('historical');
+
+        // Explicitly refetch all data to ensure the UI is updated
+        activeCrops.refetch();
+        upcomingCrops.refetch();
+        historicalCrops.refetch();
+
+        toast({
+          title: "Crop marked as harvested",
+          description: "The crop has been moved to the historical records.",
+        });
+      } catch (error) {
+        console.error("Error marking crop as harvested:", error);
+        toast({
+          title: "Error",
+          description: "Failed to mark the crop as harvested. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsHarvestLoading(false);
+        setCropToHarvest(null);
+        setHarvestDialogOpen(false);
+      }
+    }
+  };
+
   // Handle form submission for adding/editing a crop
   const handleFormSubmit = async (cropData: Omit<ActiveCrop | HistoricalCrop, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       if (isEditing && selectedCrop?.id) {
         await updateCrop(selectedCrop.id, cropData);
+
+        // Determine which tab to show based on the new status
+        if ('status' in cropData) {
+          if (cropData.status === 'upcoming') {
+            setCurrentTab('upcoming');
+          } else if (cropData.status === 'completed') {
+            setCurrentTab('historical');
+          } else {
+            setCurrentTab('active');
+          }
+        }
+
+        // Explicitly refetch all data to ensure the UI is updated
+        activeCrops.refetch();
+        upcomingCrops.refetch();
+        historicalCrops.refetch();
+
         toast({
           title: "Crop updated",
           description: "The crop has been successfully updated.",
         });
       } else {
         await addCrop(cropData);
+
+        // Switch to the appropriate tab for the new crop
+        if ('status' in cropData) {
+          if (cropData.status === 'upcoming') {
+            setCurrentTab('upcoming');
+          } else if (cropData.status === 'completed') {
+            setCurrentTab('historical');
+          } else {
+            setCurrentTab('active');
+          }
+        }
+
+        // Explicitly refetch all data to ensure the UI is updated
+        activeCrops.refetch();
+        upcomingCrops.refetch();
+        historicalCrops.refetch();
+
         toast({
           title: "Crop added",
           description: "The crop has been successfully added to your planting schedule.",
@@ -133,6 +274,92 @@ const PlantingSchedule = () => {
       });
     }
   };
+
+  // Check if all data is loading initially
+  const isInitialLoading = activeCrops.isLoading && upcomingCrops.isLoading && historicalCrops.isLoading;
+
+  // Check for any errors across all queries
+  const hasErrors = activeCrops.error || upcomingCrops.error || historicalCrops.error;
+
+  // Show a global loading state on initial load
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Planting Schedule</h1>
+            <p className="text-muted-foreground">
+              Loading your planting data...
+            </p>
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-48" />
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="contents">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show a global error state if any of the queries failed
+  if (hasErrors) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Planting Schedule</h1>
+            <p className="text-muted-foreground">
+              There was a problem loading your data.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
+            <div>
+              <h3 className="text-red-800 font-medium">Error loading planting schedule</h3>
+              <p className="text-red-700 mt-1">
+                We encountered an issue connecting to the database. This could be due to network issues or server problems.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  activeCrops.refetch();
+                  upcomingCrops.refetch();
+                  historicalCrops.refetch();
+                }}
+              >
+                Retry Loading Data
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,7 +378,7 @@ const PlantingSchedule = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="active">
+      <Tabs value={currentTab} onValueChange={setCurrentTab}>
         <TabsList>
           <TabsTrigger value="active">Active Crops</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
@@ -193,9 +420,9 @@ const PlantingSchedule = () => {
                 Retry
               </Button>
             </div>
-          ) : activeCrops.data && activeCrops.data.filter(crop => crop.status !== 'upcoming').length > 0 ? (
+          ) : activeCrops.data && activeCrops.data.filter(crop => ['active', 'ready-to-harvest', 'delayed'].includes(crop.status)).length > 0 ? (
             activeCrops.data
-              .filter(crop => crop.status !== 'upcoming')
+              .filter(crop => ['active', 'ready-to-harvest', 'delayed'].includes(crop.status))
               .map((crop) => (
                 <Card key={crop.id}>
                   <CardHeader className="pb-2">
@@ -220,6 +447,10 @@ const PlantingSchedule = () => {
                             <DropdownMenuItem onClick={() => handleEditCrop(crop)}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleHarvestClick(crop)}>
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Mark as Harvested
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDeleteClick(crop.id!)}
@@ -331,6 +562,10 @@ const PlantingSchedule = () => {
                           <DropdownMenuItem onClick={() => handleEditCrop(crop)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleHarvestClick(crop)}>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Mark as Harvested
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleDeleteClick(crop.id!)}
@@ -495,6 +730,90 @@ const PlantingSchedule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Harvest Dialog */}
+      <Dialog open={harvestDialogOpen} onOpenChange={setHarvestDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Mark Crop as Harvested</DialogTitle>
+            <DialogDescription>
+              Enter harvest details to move this crop to historical records.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {cropToHarvest && (
+              <div className="font-medium">
+                {cropToHarvest.name} - {cropToHarvest.variety}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Harvest Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !harvestDate && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {harvestDate ? format(harvestDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={harvestDate}
+                    onSelect={setHarvestDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="yield">Yield</Label>
+              <Input
+                id="yield"
+                value={yieldAmount}
+                onChange={(e) => setYieldAmount(e.target.value)}
+                placeholder="e.g., 18.5 tons, 2500 kg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={harvestNotes}
+                onChange={(e) => setHarvestNotes(e.target.value)}
+                placeholder="Any additional notes about this harvest"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setHarvestDialogOpen(false)}
+              disabled={isHarvestLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmHarvest}
+              disabled={isHarvestLoading || !harvestDate}
+            >
+              {isHarvestLoading ? 'Saving...' : 'Mark as Harvested'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,15 +1,15 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  getDoc, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp, 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
   Timestamp,
   DocumentData
 } from 'firebase/firestore';
@@ -56,7 +56,7 @@ export const isHistoricalCrop = (crop: Crop): crop is HistoricalCrop => {
 // Helper function to convert Firestore document to Crop object
 export const convertDocToCrop = (doc: DocumentData): Crop => {
   const data = doc.data();
-  
+
   if (data.status === 'completed') {
     return {
       id: doc.id,
@@ -101,7 +101,7 @@ export const addCrop = async (crop: Omit<Crop, 'id' | 'createdAt' | 'updatedAt'>
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  
+
   const docRef = await addDoc(cropsCollection, cropWithTimestamps);
   return docRef.id;
 };
@@ -113,66 +113,99 @@ export const getCropsByUserId = async (userId: string): Promise<Crop[]> => {
     where('userId', '==', userId),
     orderBy('createdAt', 'desc')
   );
-  
+
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(convertDocToCrop);
 };
 
 // Get active crops (not completed) for the current user
 export const getActiveCrops = async (userId: string): Promise<ActiveCrop[]> => {
-  const q = query(
-    cropsCollection,
-    where('userId', '==', userId),
-    where('status', 'in', ['upcoming', 'active', 'ready-to-harvest', 'delayed']),
-    orderBy('plantingDate', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => convertDocToCrop(doc) as ActiveCrop);
+  try {
+    if (!userId) {
+      console.error("getActiveCrops called with empty userId");
+      return [];
+    }
+
+    const q = query(
+      cropsCollection,
+      where('userId', '==', userId),
+      where('status', 'in', ['active', 'ready-to-harvest', 'delayed']),
+      orderBy('plantingDate', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => convertDocToCrop(doc) as ActiveCrop);
+  } catch (error) {
+    console.error("Error fetching active crops:", error);
+    // Re-throw the error to be handled by the React Query retry mechanism
+    throw error;
+  }
 };
 
 // Get upcoming crops for the current user
 export const getUpcomingCrops = async (userId: string): Promise<ActiveCrop[]> => {
-  const q = query(
-    cropsCollection,
-    where('userId', '==', userId),
-    where('status', '==', 'upcoming'),
-    orderBy('plantingDate', 'asc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => convertDocToCrop(doc) as ActiveCrop);
+  try {
+    if (!userId) {
+      console.error("getUpcomingCrops called with empty userId");
+      return [];
+    }
+
+    const q = query(
+      cropsCollection,
+      where('userId', '==', userId),
+      where('status', '==', 'upcoming'),
+      orderBy('plantingDate', 'asc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => convertDocToCrop(doc) as ActiveCrop);
+  } catch (error) {
+    console.error("Error fetching upcoming crops:", error);
+    // Re-throw the error to be handled by the React Query retry mechanism
+    throw error;
+  }
 };
 
 // Get historical crops for the current user
 export const getHistoricalCrops = async (userId: string): Promise<HistoricalCrop[]> => {
-  const q = query(
-    cropsCollection,
-    where('userId', '==', userId),
-    where('status', '==', 'completed'),
-    orderBy('harvestDate', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => convertDocToCrop(doc) as HistoricalCrop);
+  try {
+    if (!userId) {
+      console.error("getHistoricalCrops called with empty userId");
+      return [];
+    }
+
+    const q = query(
+      cropsCollection,
+      where('userId', '==', userId),
+      where('status', '==', 'completed'),
+      orderBy('harvestDate', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => convertDocToCrop(doc) as HistoricalCrop);
+  } catch (error) {
+    console.error("Error fetching historical crops:", error);
+    // Re-throw the error to be handled by the React Query retry mechanism
+    throw error;
+  }
 };
 
 // Get a single crop by ID
 export const getCropById = async (cropId: string): Promise<Crop | null> => {
   const docRef = doc(db, 'crops', cropId);
   const docSnap = await getDoc(docRef);
-  
+
   if (docSnap.exists()) {
     return convertDocToCrop(docSnap);
   }
-  
+
   return null;
 };
 
 // Update a crop
 export const updateCrop = async (cropId: string, cropData: Partial<Crop>): Promise<void> => {
   const docRef = doc(db, 'crops', cropId);
-  
+
   await updateDoc(docRef, {
     ...cropData,
     updatedAt: serverTimestamp(),
@@ -188,7 +221,7 @@ export const deleteCrop = async (cropId: string): Promise<void> => {
 // Update crop status
 export const updateCropStatus = async (cropId: string, status: CropStatus): Promise<void> => {
   const docRef = doc(db, 'crops', cropId);
-  
+
   await updateDoc(docRef, {
     status,
     updatedAt: serverTimestamp(),
@@ -197,33 +230,50 @@ export const updateCropStatus = async (cropId: string, status: CropStatus): Prom
 
 // Mark a crop as completed (harvested)
 export const markCropAsHarvested = async (
-  cropId: string, 
-  harvestDate: string, 
-  yieldAmount: string, 
+  cropId: string,
+  harvestDate: string,
+  yieldAmount: string,
   notes: string
 ): Promise<void> => {
-  const docRef = doc(db, 'crops', cropId);
-  
-  await updateDoc(docRef, {
-    status: 'completed',
-    harvestDate,
-    yield: yieldAmount,
-    notes,
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    if (!cropId) {
+      throw new Error("markCropAsHarvested called with empty cropId");
+    }
+
+    const docRef = doc(db, 'crops', cropId);
+
+    // First check if the crop exists
+    const cropDoc = await getDoc(docRef);
+    if (!cropDoc.exists()) {
+      throw new Error(`Crop with ID ${cropId} not found`);
+    }
+
+    await updateDoc(docRef, {
+      status: 'completed',
+      harvestDate,
+      yield: yieldAmount,
+      notes,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log(`Successfully marked crop ${cropId} as harvested`);
+  } catch (error) {
+    console.error("Error marking crop as harvested:", error);
+    throw error;
+  }
 };
 
 // Add an alert to a crop
 export const addCropAlert = async (cropId: string, alert: string): Promise<void> => {
   const cropDoc = await getCropById(cropId);
-  
+
   if (!cropDoc || isHistoricalCrop(cropDoc)) {
     throw new Error('Cannot add alert to a historical crop');
   }
-  
+
   const docRef = doc(db, 'crops', cropId);
   const alerts = [...cropDoc.alerts, alert];
-  
+
   await updateDoc(docRef, {
     alerts,
     updatedAt: serverTimestamp(),
@@ -233,15 +283,15 @@ export const addCropAlert = async (cropId: string, alert: string): Promise<void>
 // Remove an alert from a crop
 export const removeCropAlert = async (cropId: string, alertIndex: number): Promise<void> => {
   const cropDoc = await getCropById(cropId);
-  
+
   if (!cropDoc || isHistoricalCrop(cropDoc)) {
     throw new Error('Cannot remove alert from a historical crop');
   }
-  
+
   const docRef = doc(db, 'crops', cropId);
   const alerts = [...cropDoc.alerts];
   alerts.splice(alertIndex, 1);
-  
+
   await updateDoc(docRef, {
     alerts,
     updatedAt: serverTimestamp(),
