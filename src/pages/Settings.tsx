@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/lib/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
+import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 const Settings = () => {
+  const { currentUser } = useAuth();
+  const { toast } = useToast();
+
+  // User profile state
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState(""); // Leave blank if not available
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Notification settings
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -21,6 +35,135 @@ const Settings = () => {
     marketUpdates: false,
     systemUpdates: true,
   });
+
+  // Load user data when component mounts
+  useEffect(() => {
+    if (currentUser) {
+      // Set email from Firebase auth
+      setEmail(currentUser.email || "");
+
+      // Parse displayName to get first and last name
+      if (currentUser.displayName) {
+        const nameParts = currentUser.displayName.split(" ");
+        setFirstName(nameParts[0] || "");
+        setLastName(nameParts.slice(1).join(" ") || "");
+      }
+
+      // Explicitly ensure phone is empty (not email)
+      setPhone("");
+    }
+  }, [currentUser]);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Handle profile update
+  const handleProfileUpdate = async () => {
+    if (!currentUser) return;
+
+    try {
+      setIsLoading(true);
+
+      // Update display name in Firebase
+      await updateProfile(currentUser, {
+        displayName: `${firstName} ${lastName}`
+      });
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Update Failed",
+        description: "There was a problem updating your profile.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle password change
+  const handlePasswordChange = async () => {
+    if (!currentUser || !currentUser.email) return;
+
+    // Validate passwords
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all password fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+
+      // Re-authenticate user before changing password
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Update password
+      await updatePassword(currentUser, newPassword);
+
+      // Clear password fields
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been changed successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+
+      let errorMessage = "There was a problem changing your password.";
+
+      // Handle specific Firebase errors
+      if (error.code === "auth/wrong-password") {
+        errorMessage = "Current password is incorrect.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many attempts. Please try again later.";
+      }
+
+      toast({
+        title: "Password Change Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -38,7 +181,7 @@ const Settings = () => {
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="sensors">IoT Sensors</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="profile" className="pt-4 space-y-4">
           <Card>
             <CardHeader>
@@ -48,25 +191,56 @@ const Settings = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="John" />
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="Doe" />
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue="john@example.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  disabled={true} // Email can't be changed in Firebase without re-authentication
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email address cannot be changed directly. Please contact support for assistance.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" type="tel" defaultValue="+63 912 345 6789" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                  disabled={isLoading}
+                />
               </div>
-              <Button>Save Changes</Button>
+              <Button
+                onClick={handleProfileUpdate}
+                disabled={isLoading}
+              >
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
@@ -74,21 +248,49 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" />
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  disabled={isChangingPassword}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" />
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={isChangingPassword}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" />
+                <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                <Input
+                  id="confirmNewPassword"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  disabled={isChangingPassword}
+                />
               </div>
-              <Button>Change Password</Button>
+              <Button
+                onClick={handlePasswordChange}
+                disabled={isChangingPassword || !currentUser?.email}
+              >
+                {isChangingPassword ? "Changing Password..." : "Change Password"}
+              </Button>
+              {!currentUser?.email && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Password change is only available for email/password accounts.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="farm" className="pt-4 space-y-4">
           <Card>
             <CardHeader>
@@ -97,34 +299,34 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="farmName">Farm Name</Label>
-                <Input id="farmName" defaultValue="Green Valley Farm" />
+                <Input id="farmName" placeholder="Enter farm name" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" defaultValue="123 Agriculture Road" />
+                <Input id="address" placeholder="Enter farm address" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="city">City/Municipality</Label>
-                  <Input id="city" defaultValue="San Fernando" />
+                  <Input id="city" placeholder="City" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="province">Province</Label>
-                  <Input id="province" defaultValue="Pampanga" />
+                  <Input id="province" placeholder="Province" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="zipCode">ZIP Code</Label>
-                  <Input id="zipCode" defaultValue="2000" />
+                  <Input id="zipCode" placeholder="ZIP Code" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="coordinates">GPS Coordinates</Label>
-                <Input id="coordinates" defaultValue="15.0333° N, 120.6833° E" />
+                <Input id="coordinates" placeholder="Latitude, Longitude" />
               </div>
               <Button>Save Location</Button>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Farm Details</CardTitle>
@@ -132,21 +334,21 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="farmSize">Total Farm Size (hectares)</Label>
-                <Input id="farmSize" type="number" defaultValue="5.5" />
+                <Input id="farmSize" type="number" placeholder="Enter farm size" />
               </div>
               <div className="space-y-2">
                 <Label>Primary Crops</Label>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="rice" defaultChecked />
+                    <input type="checkbox" id="rice" />
                     <Label htmlFor="rice">Rice</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="corn" defaultChecked />
+                    <input type="checkbox" id="corn" />
                     <Label htmlFor="corn">Corn</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="vegetables" defaultChecked />
+                    <input type="checkbox" id="vegetables" />
                     <Label htmlFor="vegetables">Vegetables</Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -162,8 +364,9 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label htmlFor="soilType">Soil Type</Label>
                 <select id="soilType" className="w-full rounded-md border p-2">
+                  <option value="">Select soil type</option>
                   <option value="clay">Clay</option>
-                  <option value="loam" selected>Loam</option>
+                  <option value="loam">Loam</option>
                   <option value="sandy">Sandy</option>
                   <option value="silty">Silty</option>
                 </select>
@@ -172,7 +375,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="notifications" className="pt-4 space-y-4">
           <Card>
             <CardHeader>
@@ -228,7 +431,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Notification Types</CardTitle>
@@ -290,7 +493,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="sensors" className="pt-4 space-y-4">
           <Card>
             <CardHeader>
@@ -316,7 +519,7 @@ const Settings = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start space-x-4">
                   <div className="h-10 w-10 bg-blue-100 rounded-md flex items-center justify-center text-blue-700">
                     <span className="font-medium">2</span>
@@ -328,7 +531,7 @@ const Settings = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start space-x-4">
                   <div className="h-10 w-10 bg-blue-100 rounded-md flex items-center justify-center text-blue-700">
                     <span className="font-medium">3</span>
@@ -344,7 +547,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Connected Sensors</CardTitle>
