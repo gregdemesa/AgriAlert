@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { WeatherCard } from "@/components/dashboard/WeatherCard";
 import { ForecastCard } from "@/components/dashboard/ForecastCard";
 import { HistoricalWeatherCard } from "@/components/weather/HistoricalWeatherCard";
@@ -25,11 +25,19 @@ const Weather = () => {
   const { hourlyForecast } = useWeather();
 
   // Transform hourly forecast data for the chart
-  const hourlyData = hourlyForecast.data?.map(item => ({
-    time: item.time,
-    temperature: item.temperature,
-    humidity: item.humidity
-  })) || [];
+  const hourlyData = React.useMemo(() => {
+    if (!hourlyForecast.data || hourlyForecast.data.length === 0) {
+      console.log('No hourly forecast data available');
+      return [];
+    }
+
+    console.log(`Transforming ${hourlyForecast.data.length} hourly forecast items for chart`);
+    return hourlyForecast.data.map(item => ({
+      time: item.time,
+      temperature: item.temperature,
+      humidity: item.humidity
+    }));
+  }, [hourlyForecast.data]);
 
   // Mock data for monthly rainfall
   const monthlyData = [
@@ -74,7 +82,7 @@ const Weather = () => {
           <TabsTrigger value="historical">Historical Data</TabsTrigger>
           <TabsTrigger value="statistics">Weather Statistics</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="hourly" className="pt-4">
           <Card>
             <CardHeader>
@@ -88,7 +96,10 @@ const Weather = () => {
                   </div>
                 ) : hourlyForecast.error ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <p>Error loading hourly forecast data.</p>
+                    <p>Error loading hourly forecast data:</p>
+                    <p className="text-sm text-red-500 mt-1 mb-2">
+                      {hourlyForecast.error.message || "Unknown error"}
+                    </p>
                     <button
                       onClick={() => hourlyForecast.refetch()}
                       className="mt-2 text-sm text-primary hover:underline"
@@ -97,8 +108,14 @@ const Weather = () => {
                     </button>
                   </div>
                 ) : hourlyData.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Hourly forecast data unavailable
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <p>Hourly forecast data unavailable</p>
+                    <button
+                      onClick={() => hourlyForecast.refetch()}
+                      className="mt-2 text-sm text-primary hover:underline"
+                    >
+                      Try again
+                    </button>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -130,7 +147,7 @@ const Weather = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="rainfall" className="pt-4">
           <Card>
             <CardHeader>
@@ -171,11 +188,11 @@ const Weather = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="historical" className="pt-4">
           <HistoricalWeatherCard />
         </TabsContent>
-        
+
         <TabsContent value="statistics" className="pt-4">
           <WeatherStatisticsCard />
         </TabsContent>

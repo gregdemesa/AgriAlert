@@ -6,6 +6,9 @@ const API_BASE_URL = 'https://api.weatherapi.com/v1';
 // API key from environment variables
 const API_KEY = import.meta.env.VITE_FREE_WEATHER_API;
 
+// Log API key availability (not the actual key for security)
+console.log('WeatherAPI.com API key available:', !!API_KEY);
+
 // Weather condition mapping
 export type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'windy' | 'stormy' | 'snowy';
 
@@ -193,18 +196,43 @@ export const fetchForecast = async (location: LocationData): Promise<ForecastDay
 // Function to fetch hourly forecast for the next 24 hours
 export const fetchHourlyForecast = async (location: LocationData): Promise<HourlyForecast[]> => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no&alerts=yes&hour=24`
-    );
+    console.log('Fetching hourly forecast for location:', location);
+
+    const url = `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no&alerts=yes`;
+    console.log('Hourly forecast API URL:', url);
+
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error('Failed to fetch hourly forecast');
+      console.error('Failed to fetch hourly forecast, status:', response.status);
+      throw new Error(`Failed to fetch hourly forecast: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Hourly forecast API response received');
+
+    // Log the response data structure for debugging
+    console.log('Hourly forecast API response structure:',
+      JSON.stringify({
+        hasForecast: !!data.forecast,
+        hasForecastDay: !!(data.forecast && data.forecast.forecastday),
+        forecastDayLength: data.forecast && data.forecast.forecastday ? data.forecast.forecastday.length : 0,
+        hasHour: !!(data.forecast && data.forecast.forecastday && data.forecast.forecastday[0] && data.forecast.forecastday[0].hour),
+        hourLength: data.forecast && data.forecast.forecastday && data.forecast.forecastday[0] && data.forecast.forecastday[0].hour ? data.forecast.forecastday[0].hour.length : 0
+      })
+    );
+
+    // Validate the response structure
+    if (!data.forecast || !data.forecast.forecastday || !data.forecast.forecastday[0] || !data.forecast.forecastday[0].hour) {
+      console.error('Unexpected API response structure:', data);
+      return [];
+    }
+
+    const hourlyItems = data.forecast.forecastday[0].hour;
+    console.log(`Processing ${hourlyItems.length} hourly forecast items`);
 
     // Process the hourly forecast data (first 24 hours)
-    const hourlyData: HourlyForecast[] = data.forecast.forecastday[0].hour.map((item: any) => {
+    const hourlyData: HourlyForecast[] = hourlyItems.map((item: any) => {
       const date = new Date(item.time);
       return {
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true }),
@@ -215,6 +243,7 @@ export const fetchHourlyForecast = async (location: LocationData): Promise<Hourl
       };
     });
 
+    console.log(`Processed ${hourlyData.length} hourly forecast items successfully`);
     return hourlyData;
   } catch (error) {
     console.error('Error fetching hourly forecast:', error);
