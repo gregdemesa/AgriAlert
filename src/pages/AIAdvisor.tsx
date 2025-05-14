@@ -3,10 +3,18 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Loader2, Image as ImageIcon, X, ArrowDown } from "lucide-react";
+import { MessageSquare, Loader2, Image as ImageIcon, X, ArrowDown, Mic, MicOff } from "lucide-react";
 import { useGemini } from "@/lib/GeminiContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import speechToTextService from "@/lib/speechToTextService";
+import { toast } from "@/components/ui/sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const AIAdvisor = () => {
   const [message, setMessage] = useState("");
@@ -14,6 +22,8 @@ const AIAdvisor = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const dropZoneRef = useRef<HTMLLabelElement>(null);
@@ -21,6 +31,58 @@ const AIAdvisor = () => {
 
   // Use the Gemini context instead of local state
   const { chatHistory, isLoading, sendMessage, sendImageMessage, clearChat } = useGemini();
+
+  // Initialize speech recognition
+  useEffect(() => {
+    // Set up speech recognition callbacks
+    speechToTextService.onStart(() => {
+      setIsListening(true);
+      setInterimTranscript("");
+      toast("Listening...", {
+        description: "Speak in any language. Click the microphone button again to stop.",
+        duration: 5000,
+      });
+    });
+
+    speechToTextService.onResult((result) => {
+      if (result.isFinal) {
+        setMessage((prev) => {
+          const newMessage = prev.trim() ? `${prev} ${result.transcript}` : result.transcript;
+          return newMessage;
+        });
+        setInterimTranscript("");
+      } else {
+        setInterimTranscript(result.transcript);
+      }
+    });
+
+    speechToTextService.onError((error) => {
+      console.error("Speech recognition error:", error);
+      setIsListening(false);
+      toast("Speech recognition error", {
+        description: error.message,
+      });
+    });
+
+    speechToTextService.onEnd(() => {
+      setIsListening(false);
+      setInterimTranscript("");
+    });
+  }, []);
+
+  // Toggle speech recognition
+  const toggleSpeechRecognition = () => {
+    if (isListening) {
+      speechToTextService.stopListening();
+    } else {
+      const success = speechToTextService.startListening();
+      if (!success) {
+        toast("Speech recognition not available", {
+          description: "Your browser may not support this feature or microphone access was denied.",
+        });
+      }
+    }
+  };
 
   // Handle scroll events to show/hide scroll button
   useEffect(() => {
@@ -262,14 +324,47 @@ const AIAdvisor = () => {
               </div>
             )}
             <form onSubmit={handleSubmit} className="flex gap-2">
-              <Input
-                ref={messageInputRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your farming question..."
-                className="flex-1"
-                disabled={isLoading}
-              />
+              <div className="relative flex-1">
+                <Input
+                  ref={messageInputRef}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={isListening ? '' : "Type your farming question..."}
+                  className={`flex-1 pr-10 ${isListening ? 'border-agri-green text-transparent' : ''}`}
+                  disabled={isLoading}
+                />
+                {isListening && (
+                  <div className="absolute inset-0 flex items-center px-3 pointer-events-none overflow-hidden bg-background">
+                    <span className={`truncate ${interimTranscript || message ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {message || interimTranscript ? `${message} ${interimTranscript}` : "Listening..."}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleSpeechRecognition}
+                      disabled={isLoading}
+                      className={isListening ? 'bg-agri-green text-white hover:bg-agri-green/90' : ''}
+                    >
+                      {isListening ? (
+                        <MicOff className="h-4 w-4" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isListening ? 'Stop listening' : 'Start voice input (any language)'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button
                 type="button"
                 variant="outline"
