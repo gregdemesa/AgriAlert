@@ -53,33 +53,17 @@ export function HistoricalWeatherCard() {
       // Extract and format date as numbers with time
       let formattedDate = "";
       try {
-        // Try to extract both date and time components
+        // Try to extract date only
         const fullDate = new Date(item.date);
         if (!isNaN(fullDate.getTime())) {
           // Valid date object created - use direct date methods
           const month = fullDate.getMonth() + 1; // Months are 0-indexed
           const day = fullDate.getDate();
-          const hours = fullDate.getHours();
-          const minutes = fullDate.getMinutes();
-          const ampm = hours >= 12 ? 'PM' : 'AM';
-          const hour12 = hours % 12 || 12; // Convert to 12-hour format
-          
-          formattedDate = `${month}/${day} ${hour12}${minutes === 0 ? '' : ':' + minutes.toString().padStart(2, '0')}${ampm}`;
+          formattedDate = `${month}/${day}`;
         } else {
           // Fallback to string parsing
           const parts = item.date.split(',');
           const datePart = parts[0].trim();
-          let timePart = "";
-          
-          // Try to extract time from the string
-          if (parts.length > 1) {
-            timePart = parts[1].trim();
-          } else {
-            const timeMatch = item.date.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i);
-            if (timeMatch) {
-              timePart = timeMatch[0];
-            }
-          }
           
           // Parse the date part
           const dateParts = datePart.split(' ');
@@ -91,7 +75,7 @@ export function HistoricalWeatherCard() {
             const month = monthNames.indexOf(monthAbbr) + 1;
             
             if (month > 0 && !isNaN(day)) {
-              formattedDate = `${month}/${day}${timePart ? ' ' + timePart : ''}`;
+              formattedDate = `${month}/${day}`;
             } else {
               formattedDate = item.date;
             }
@@ -106,7 +90,7 @@ export function HistoricalWeatherCard() {
       
       return {
         date: formattedDate,
-        temperature: item.temperature,
+        temperature: item.temperature.avg, // Use average temperature for the chart
         humidity: item.humidity,
         pressure: item.pressure / 10, // Scale down for better visualization
       };
@@ -311,11 +295,11 @@ export function HistoricalWeatherCard() {
                   {historicalWeather.data.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell className="whitespace-nowrap">{item.date}</TableCell>
-                      <TableCell>{item.temperature}</TableCell>
-                      <TableCell>{item.humidity}</TableCell>
-                      <TableCell>{item.windSpeed}</TableCell>
-                      <TableCell>{item.pressure}</TableCell>
-                      <TableCell>{item.description}</TableCell>
+                      <TableCell>{`${item.temperature.avg}°C (${item.temperature.min}°C - ${item.temperature.max}°C)`}</TableCell>
+                      <TableCell>{item.humidity}%</TableCell>
+                      <TableCell>{item.windSpeed} km/h</TableCell>
+                      <TableCell>{item.pressure} hPa</TableCell>
+                      <TableCell>{item.condition}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

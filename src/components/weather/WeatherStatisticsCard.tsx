@@ -187,7 +187,7 @@ export function WeatherStatisticsCard() {
                         label={(entry) => `${entry.name}: ${entry.value} days`}
                       >
                         <Cell key="cell-0" fill="#3B82F6" /> {/* Blue for rainy days */}
-                        <Cell key="cell-1" fill="#E5E7EB" /> {/* Gray for dry days */}
+                        <Cell key="cell-1" fill="#10B981" /> {/* Emerald for dry days */}
                       </Pie>
                       <Tooltip formatter={(value) => [`${value} days`, 'Duration']} />
                       <Legend />
@@ -209,6 +209,11 @@ export function WeatherStatisticsCard() {
                     weatherStatistics.data.humidity.avg > 80 ? 'High humidity may increase disease risk' :
                     weatherStatistics.data.humidity.avg < 40 ? 'Low humidity may increase water requirements' :
                     'Moderate humidity levels'
+                  }</p>
+                  <p><strong>Wind Impact:</strong> {
+                    weatherStatistics.data.windSpeed.avg > 20 ? 'Strong winds may affect pollination and crop stability' :
+                    weatherStatistics.data.windSpeed.avg > 10 ? 'Moderate winds may help with air circulation' :
+                    'Light winds, good for most agricultural activities'
                   }</p>
                 </div>
               </div>

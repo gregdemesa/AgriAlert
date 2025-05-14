@@ -45,30 +45,87 @@ const mapWeatherCondition = (conditionCode: number, conditionText: string): Weat
   return 'sunny';
 };
 
+// Weather API Response interfaces
+interface WeatherAPIResponse {
+  location: {
+    name: string;
+    region: string;
+    localtime: string;
+  };
+  current: {
+    temp_c: number;
+    humidity: number;
+    wind_kph: number;
+    pressure_mb: number;
+    condition: {
+      code: number;
+      text: string;
+      icon: string;
+    };
+    feelslike_c: number;
+    vis_km: number;
+  };
+  forecast: {
+    forecastday: Array<{
+      date: string;
+      day: {
+        avgtemp_c: number;
+        mintemp_c: number;
+        maxtemp_c: number;
+        avghumidity: number;
+        totalprecip_mm: number;
+        condition: {
+          code: number;
+          text: string;
+          icon: string;
+        };
+      };
+      hour: Array<{
+        time: string;
+        temp_c: number;
+        humidity: number;
+        wind_kph: number;
+        pressure_mb: number;
+        condition: {
+          code: number;
+          text: string;
+          icon: string;
+        };
+      }>;
+      astro: {
+        sunrise: string;
+        sunset: string;
+      };
+    }>;
+  };
+}
+
 // Current weather interface
 export interface CurrentWeather {
   temperature: number;
-  condition: WeatherCondition;
   humidity: number;
+  condition: WeatherCondition;
   windSpeed: number;
+  pressure: number;
+  icon: string;
   location: string;
   description: string;
   feelsLike: number;
-  pressure: number;
   visibility: number;
   sunrise: number;
   sunset: number;
-  icon: string;
 }
 
 // Forecast day interface
 export interface ForecastDay {
-  day: string;
   date: string;
+  day: string;
   temperature: {
-    high: number;
-    low: number;
+    avg: number;
+    min: number;
+    max: number;
   };
+  humidity: number;
   condition: WeatherCondition;
   precipitation: number;
   icon: string;
@@ -81,188 +138,8 @@ export interface HourlyForecast {
   temperature: number;
   humidity: number;
   condition: WeatherCondition;
+  windSpeed: number;
   icon: string;
-}
-
-// Function to fetch current weather
-export const fetchCurrentWeather = async (location: LocationData): Promise<CurrentWeather> => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/current.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&aqi=no`
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch current weather');
-    }
-
-    const data = await response.json();
-
-    // Extract location and current weather data
-    const { location: locationData, current } = data;
-
-    // Map the API response to our CurrentWeather interface
-    const weather: CurrentWeather = {
-      temperature: Math.round(current.temp_c),
-      condition: mapWeatherCondition(current.condition.code, current.condition.text),
-      humidity: current.humidity,
-      windSpeed: Math.round(current.wind_kph),
-      location: `${locationData.name}, ${locationData.region}`,
-      description: current.condition.text,
-      feelsLike: Math.round(current.feelslike_c),
-      pressure: current.pressure_mb,
-      visibility: current.vis_km,
-      // Use default values for sunrise and sunset if not available
-      sunrise: 0,
-      sunset: 0,
-      icon: `https:${current.condition.icon}`,
-    };
-
-    // Try to get sunrise and sunset times if available
-    try {
-      // Make a separate request to get forecast data with astronomy info
-      const forecastResponse = await fetch(
-        `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no`
-      );
-
-      if (forecastResponse.ok) {
-        const forecastData = await forecastResponse.json();
-        if (forecastData.forecast && forecastData.forecast.forecastday && forecastData.forecast.forecastday.length > 0) {
-          const astro = forecastData.forecast.forecastday[0].astro;
-          if (astro) {
-            // Convert 12-hour time format to timestamp
-            const sunriseTime = astro.sunrise;
-            const sunsetTime = astro.sunset;
-
-            const sunriseDate = new Date(`${locationData.localtime.split(' ')[0]} ${sunriseTime}`);
-            const sunsetDate = new Date(`${locationData.localtime.split(' ')[0]} ${sunsetTime}`);
-
-            weather.sunrise = Math.floor(sunriseDate.getTime() / 1000);
-            weather.sunset = Math.floor(sunsetDate.getTime() / 1000);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching sunrise/sunset times:', error);
-      // Use default values if there's an error
-    }
-
-    return weather;
-  } catch (error) {
-    console.error('Error fetching current weather:', error);
-    throw error;
-  }
-};
-
-// Function to fetch 5-day forecast
-export const fetchForecast = async (location: LocationData): Promise<ForecastDay[]> => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=5&aqi=no&alerts=yes`
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch forecast');
-    }
-
-    const data = await response.json();
-
-    // Process the forecast data
-    // WeatherAPI.com returns forecast for up to 14 days
-    // We'll take the first 5 days
-
-    const forecastDays: ForecastDay[] = data.forecast.forecastday.map((item: any) => {
-      const date = new Date(item.date);
-      return {
-        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        date: date.toLocaleDateString('en-US'),
-        temperature: {
-          high: Math.round(item.day.maxtemp_c),
-          low: Math.round(item.day.mintemp_c),
-        },
-        condition: mapWeatherCondition(item.day.condition.code, item.day.condition.text),
-        precipitation: Math.round(item.day.daily_chance_of_rain),
-        icon: `https:${item.day.condition.icon}`,
-        description: item.day.condition.text,
-      };
-    });
-
-    return forecastDays;
-  } catch (error) {
-    console.error('Error fetching forecast:', error);
-    throw error;
-  }
-};
-
-// Function to fetch hourly forecast for the next 24 hours
-export const fetchHourlyForecast = async (location: LocationData): Promise<HourlyForecast[]> => {
-  try {
-    console.log('Fetching hourly forecast for location:', location);
-
-    const url = `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1&aqi=no&alerts=yes`;
-    console.log('Hourly forecast API URL:', url);
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      console.error('Failed to fetch hourly forecast, status:', response.status);
-      throw new Error(`Failed to fetch hourly forecast: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('Hourly forecast API response received');
-
-    // Log the response data structure for debugging
-    console.log('Hourly forecast API response structure:',
-      JSON.stringify({
-        hasForecast: !!data.forecast,
-        hasForecastDay: !!(data.forecast && data.forecast.forecastday),
-        forecastDayLength: data.forecast && data.forecast.forecastday ? data.forecast.forecastday.length : 0,
-        hasHour: !!(data.forecast && data.forecast.forecastday && data.forecast.forecastday[0] && data.forecast.forecastday[0].hour),
-        hourLength: data.forecast && data.forecast.forecastday && data.forecast.forecastday[0] && data.forecast.forecastday[0].hour ? data.forecast.forecastday[0].hour.length : 0
-      })
-    );
-
-    // Validate the response structure
-    if (!data.forecast || !data.forecast.forecastday || !data.forecast.forecastday[0] || !data.forecast.forecastday[0].hour) {
-      console.error('Unexpected API response structure:', data);
-      return [];
-    }
-
-    const hourlyItems = data.forecast.forecastday[0].hour;
-    console.log(`Processing ${hourlyItems.length} hourly forecast items`);
-
-    // Process the hourly forecast data (first 24 hours)
-    const hourlyData: HourlyForecast[] = hourlyItems.map((item: any) => {
-      const date = new Date(item.time);
-      return {
-        time: date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true }),
-        temperature: Math.round(item.temp_c),
-        humidity: item.humidity,
-        condition: mapWeatherCondition(item.condition.code, item.condition.text),
-        icon: `https:${item.condition.icon}`,
-      };
-    });
-
-    console.log(`Processed ${hourlyData.length} hourly forecast items successfully`);
-    return hourlyData;
-  } catch (error) {
-    console.error('Error fetching hourly forecast:', error);
-    throw error;
-  }
-};
-
-// Weather alert interface
-export interface WeatherAlert {
-  headline: string;
-  severity: string;
-  urgency: string;
-  areas: string;
-  category: string;
-  event: string;
-  effective: string;
-  expires: string;
-  description: string;
-  instruction: string;
 }
 
 // Historical weather interface
@@ -277,6 +154,8 @@ export interface HistoricalWeather {
   condition: WeatherCondition;
   precipitation: number;
   icon: string;
+  windSpeed: number;
+  pressure: number;
 }
 
 // Weather statistics interface
@@ -316,6 +195,130 @@ export const mapAlertSeverity = (severity: string): 'warning' | 'severe' | 'emer
       return 'warning';
   }
 };
+
+// Function to fetch current weather
+export const fetchCurrentWeather = async (location: LocationData): Promise<CurrentWeather> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/current.json?key=${API_KEY}&q=${location.latitude},${location.longitude}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch current weather');
+    }
+
+    const data: WeatherAPIResponse = await response.json();
+
+    // Get sunrise and sunset times
+    const forecastResponse = await fetch(
+      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1`
+    );
+
+    let sunrise = 0;
+    let sunset = 0;
+
+    if (forecastResponse.ok) {
+      const forecastData: WeatherAPIResponse = await forecastResponse.json();
+      if (forecastData.forecast?.forecastday?.[0]?.astro) {
+        const astro = forecastData.forecast.forecastday[0].astro;
+        const sunriseDate = new Date(`${data.location.localtime.split(' ')[0]} ${astro.sunrise}`);
+        const sunsetDate = new Date(`${data.location.localtime.split(' ')[0]} ${astro.sunset}`);
+        sunrise = Math.floor(sunriseDate.getTime() / 1000);
+        sunset = Math.floor(sunsetDate.getTime() / 1000);
+      }
+    }
+
+    return {
+      temperature: Math.round(data.current.temp_c),
+      humidity: data.current.humidity,
+      condition: mapWeatherCondition(data.current.condition.code, data.current.condition.text),
+      windSpeed: data.current.wind_kph,
+      pressure: data.current.pressure_mb,
+      icon: `https:${data.current.condition.icon}`,
+      location: `${data.location.name}, ${data.location.region}`,
+      description: data.current.condition.text,
+      feelsLike: Math.round(data.current.feelslike_c),
+      visibility: data.current.vis_km,
+      sunrise,
+      sunset,
+    };
+  } catch (error: unknown) {
+    console.error('Error fetching current weather:', error);
+    throw error;
+  }
+};
+
+// Function to fetch 5-day forecast
+export const fetchForecast = async (location: LocationData): Promise<ForecastDay[]> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=5`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch forecast');
+    }
+
+    const data: WeatherAPIResponse = await response.json();
+    return data.forecast.forecastday.map((day) => ({
+      date: new Date(day.date).toLocaleDateString('en-US'),
+      day: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+      temperature: {
+        avg: Math.round(day.day.avgtemp_c),
+        min: Math.round(day.day.mintemp_c),
+        max: Math.round(day.day.maxtemp_c),
+      },
+      humidity: day.day.avghumidity,
+      condition: mapWeatherCondition(day.day.condition.code, day.day.condition.text),
+      precipitation: day.day.totalprecip_mm,
+      icon: `https:${day.day.condition.icon}`,
+      description: day.day.condition.text,
+    }));
+  } catch (error: unknown) {
+    console.error('Error fetching forecast:', error);
+    throw error;
+  }
+};
+
+// Function to fetch hourly forecast for the next 24 hours
+export const fetchHourlyForecast = async (location: LocationData): Promise<HourlyForecast[]> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/forecast.json?key=${API_KEY}&q=${location.latitude},${location.longitude}&days=1`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch hourly forecast');
+    }
+
+    const data: WeatherAPIResponse = await response.json();
+    return data.forecast.forecastday[0].hour.map((hour) => ({
+      time: new Date(hour.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      temperature: Math.round(hour.temp_c),
+      humidity: hour.humidity,
+      condition: mapWeatherCondition(hour.condition.code, hour.condition.text),
+      windSpeed: hour.wind_kph,
+      icon: `https:${hour.condition.icon}`,
+    }));
+  } catch (error: unknown) {
+    console.error('Error fetching hourly forecast:', error);
+    throw error;
+  }
+};
+
+// Weather alert interface
+export interface WeatherAlert {
+  headline: string;
+  severity: string;
+  urgency: string;
+  areas: string;
+  category: string;
+  event: string;
+  effective: string;
+  expires: string;
+  description: string;
+  instruction: string;
+}
 
 // Function to fetch weather alerts
 export const fetchWeatherAlerts = async (location: LocationData): Promise<WeatherAlert[]> => {
@@ -380,9 +383,12 @@ export const fetchHistoricalWeather = async (
     // We'll need to make multiple requests if the date range is more than one day
     const days: Date[] = [];
     let currentDate = new Date(startDate);
+    currentDate.setHours(0, 0, 0, 0);
+    const endDateMidnight = new Date(endDate);
+    endDateMidnight.setHours(0, 0, 0, 0);
 
-    // Create an array of dates to fetch
-    while (currentDate <= endDate) {
+    // Create an array of dates to fetch (inclusive)
+    while (currentDate <= endDateMidnight) {
       days.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -400,11 +406,12 @@ export const fetchHistoricalWeather = async (
         throw new Error(`Failed to fetch historical weather for ${formattedDate}`);
       }
 
-      const data = await response.json();
+      const data: WeatherAPIResponse = await response.json();
 
       // Process the historical data
       if (data.forecast && data.forecast.forecastday && data.forecast.forecastday.length > 0) {
         const dayData = data.forecast.forecastday[0];
+        const hourData = dayData.hour[12]; // Get noon data for the day
 
         historicalData.push({
           date: new Date(dayData.date).toLocaleDateString('en-US'),
@@ -417,12 +424,14 @@ export const fetchHistoricalWeather = async (
           condition: mapWeatherCondition(dayData.day.condition.code, dayData.day.condition.text),
           precipitation: dayData.day.totalprecip_mm,
           icon: `https:${dayData.day.condition.icon}`,
+          windSpeed: hourData ? hourData.wind_kph : 0,
+          pressure: hourData ? hourData.pressure_mb : 0,
         });
       }
     }
 
     return historicalData;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching historical weather:', error);
     throw error;
   }
@@ -462,6 +471,12 @@ export const fetchWeatherStatistics = async (
       if (day.precipitation > 0) {
         daysWithRain++;
       }
+
+      // Wind Speed
+      if (day.windSpeed) {
+        totalWindSpeed += day.windSpeed;
+        maxWindSpeed = Math.max(maxWindSpeed, day.windSpeed);
+      }
     });
 
     // Calculate averages
@@ -491,8 +506,8 @@ export const fetchWeatherStatistics = async (
         end: endDate.toLocaleDateString('en-US'),
       },
     };
-  } catch (error) {
-    console.error('Error calculating weather statistics:', error);
+  } catch (error: unknown) {
+    console.error('Error fetching weather statistics:', error);
     throw error;
   }
 };
